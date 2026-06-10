@@ -6,6 +6,7 @@ import 'package:kalori/features/trends/widgets/calorie_trend_chart.dart';
 import 'package:kalori/features/trends/widgets/weight_progress_chart.dart';
 import 'package:kalori/features/trends/widgets/weight_log_sheet.dart';
 import 'package:kalori/shared/widgets/app_scaffold.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class TrendsScreen extends ConsumerWidget {
   const TrendsScreen({super.key});
@@ -13,26 +14,33 @@ class TrendsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final s = AppStrings.of(context);
     final state = ref.watch(trendsProvider);
 
     // Calculate weight diff
-    String weightStat = 'Log more weight data';
+    String weightStat = s.isTamil ? 'கூடுதல் எடை தரவை பதிவு செய்க' : 'Log more weight data';
     if (state.weightHistory.length >= 2) {
       final first = state.weightHistory.first;
       final last = state.weightHistory.last;
       final diff = last.weightKg - first.weightKg;
       final days = last.date.difference(first.date).inDays;
       if (diff < 0) {
-        weightStat = 'Lost ${diff.abs().toStringAsFixed(1)} kg in $days days';
+        weightStat = s.isTamil
+            ? '${diff.abs().toStringAsFixed(1)} கி.கி குறைந்துள்ளது ($days நாட்களில்)'
+            : 'Lost ${diff.abs().toStringAsFixed(1)} kg in $days days';
       } else if (diff > 0) {
-        weightStat = 'Gained ${diff.toStringAsFixed(1)} kg in $days days';
+        weightStat = s.isTamil
+            ? '${diff.toStringAsFixed(1)} கி.கி அதிகரித்துள்ளது ($days நாட்களில்)'
+            : 'Gained ${diff.toStringAsFixed(1)} kg in $days days';
       } else {
-        weightStat = 'Maintained weight over $days days';
+        weightStat = s.isTamil
+            ? 'அதே எடை பராமரிக்கப்படுகிறது ($days நாட்களாக)'
+            : 'Maintained weight over $days days';
       }
     }
 
     return AppScaffold(
-      title: 'Trends',
+      title: s.trends,
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 100),
         child: Column(
@@ -43,7 +51,7 @@ class TrendsScreen extends ConsumerWidget {
             // Section A — Calorie Trend
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Text('Calorie Trend', style: theme.textTheme.titleLarge),
+              child: Text(s.calorieTrend, style: theme.textTheme.titleLarge),
             ),
             const SizedBox(height: AppSpacing.md),
             Padding(
@@ -65,7 +73,7 @@ class TrendsScreen extends ConsumerWidget {
             // Section B — Weight Progress
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Text('Weight Progress', style: theme.textTheme.titleLarge),
+              child: Text(s.weightProgress, style: theme.textTheme.titleLarge),
             ),
             const SizedBox(height: AppSpacing.md),
             Padding(
@@ -115,7 +123,7 @@ class TrendsScreen extends ConsumerWidget {
           );
         },
         icon: const Icon(Icons.monitor_weight),
-        label: const Text('Log Weight'),
+        label: Text(s.logWeight),
       ),
     );
   }

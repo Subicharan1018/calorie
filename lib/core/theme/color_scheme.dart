@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 
 class AppColorScheme {
-  static const Color primary = Color(0xFF6C3FA3); // Approx oklch(0.533 0.125 294.3)
-  static const Color accent = Color(0xFFD66045);  // Terracotta
-  static const Color bg = Color(0xFFFFFFFF);
-  static const Color surface = Color(0xFFF7F6F9);
-  static const Color ink = Color(0xFF141118);
-  static const Color muted = Color(0xFF59555D);
+  // Light Mode Colors (OKLCH-Derived Cardamom & Saffron)
+  static const Color primary = Color(0xFF24441C);           // Cardamom Deep - oklch(0.35 0.075 140)
+  static const Color accent = Color(0xFFE49E22);            // Saffron/Turmeric Gold - oklch(0.75 0.15 75)
+  static const Color bg = Color(0xFFFFFFFF);                // Pure White Surface - oklch(1 0 0)
+  static const Color surface = Color(0xFFF2F6F1);           // Soft Sage wash - oklch(0.97 0.008 140)
+  static const Color ink = Color(0xFF070D06);               // Deep Forest Ink - oklch(0.15 0.02 140)
+  static const Color muted = Color(0xFF515750);             // Sage Muted - oklch(0.45 0.015 140)
+
+  // Dark Mode Colors (OKLCH-Derived)
+  static const Color primaryDark = Color(0xFF93BB8B);       // Cardamom Light - oklch(0.75 0.08 140)
+  static const Color accentDark = Color(0xFFEBB25F);        // Saffron Gold - oklch(0.8 0.12 75)
+  static const Color bgDark = Color(0xFF0E120D);            // Deep Charcoal-Sage - oklch(0.07 0.005 140)
+  static const Color surfaceDark = Color(0xFF181C17);       // Medium Charcoal-Sage - oklch(0.12 0.007 140)
+  static const Color inkDark = Color(0xFFE6E9E5);           // Bone - oklch(0.93 0.005 140)
+  static const Color mutedDark = Color(0xFF8C918B);         // Lichen - oklch(0.65 0.01 140)
 
   static const ColorScheme light = ColorScheme.light(
     primary: primary,
@@ -22,14 +31,14 @@ class AppColorScheme {
   );
 
   static const ColorScheme dark = ColorScheme.dark(
-    primary: Color(0xFFD0BCFF),
-    onPrimary: Color(0xFF381E72),
-    secondary: Color(0xFFFFB4A1),
-    onSecondary: Color(0xFF5E1700),
-    surface: Color(0xFF141218),
-    onSurface: Color(0xFFE6E0E9),
-    surfaceContainer: Color(0xFF2B2930),
-    outline: Color(0xFF938F99),
+    primary: primaryDark,
+    onPrimary: Color(0xFF070D06), // Deep Forest Ink for contrast on light green
+    secondary: accentDark,
+    onSecondary: Color(0xFF070D06), // Deep Forest Ink for contrast on gold
+    surface: bgDark,
+    onSurface: inkDark,
+    surfaceContainer: surfaceDark,
+    outline: mutedDark,
     error: Color(0xFFFFB4AB),
     onError: Color(0xFF690005),
   );

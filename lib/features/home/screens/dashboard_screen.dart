@@ -9,6 +9,7 @@ import 'package:kalori/features/home/widgets/micronutrient_snapshot.dart';
 import 'package:kalori/shared/widgets/app_scaffold.dart';
 import 'package:kalori/shared/widgets/stat_chip.dart';
 import 'package:intl/intl.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -17,6 +18,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(dashboardProvider);
     final today = DateTime.now();
+    final s = AppStrings.of(context);
     final formatter = DateFormat('EEEE, d MMM');
     
     // Quick translation map for today's weekday in Tamil
@@ -33,7 +35,9 @@ class DashboardScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Kalori',
-      subtitle: '${formatter.format(today)} · $tamilDay',
+      subtitle: s.isTamil
+          ? '$tamilDay, ${today.day} ${DateFormat('MMM').format(today)}'
+          : formatter.format(today),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 100),
         child: Column(
@@ -47,11 +51,11 @@ class DashboardScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                StatChip(label: 'Carbs', value: '${summary.consumedCarbs.toInt()}g', color: Theme.of(context).colorScheme.primary),
+                StatChip(label: s.carbs, value: '${summary.consumedCarbs.toInt()}g', color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: AppSpacing.sm),
-                StatChip(label: 'Protein', value: '${summary.consumedProtein.toInt()}g', color: Theme.of(context).colorScheme.secondary),
+                StatChip(label: s.protein, value: '${summary.consumedProtein.toInt()}g', color: Theme.of(context).colorScheme.secondary),
                 const SizedBox(width: AppSpacing.sm),
-                StatChip(label: 'Fat', value: '${summary.consumedFat.toInt()}g', color: Colors.amber),
+                StatChip(label: s.fat, value: '${summary.consumedFat.toInt()}g', color: const Color(0xFFD47A22)),
               ],
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -63,13 +67,13 @@ class DashboardScreen extends ConsumerWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 children: [
-                  _QuickActionChip(label: 'Breakfast', onTap: () => context.go('/log')),
+                  _QuickActionChip(label: s.breakfast.split(' · ').first, onTap: () => context.go('/log')),
                   const SizedBox(width: AppSpacing.sm),
-                  _QuickActionChip(label: 'Lunch', onTap: () => context.go('/log')),
+                  _QuickActionChip(label: s.lunch.split(' · ').first, onTap: () => context.go('/log')),
                   const SizedBox(width: AppSpacing.sm),
-                  _QuickActionChip(label: 'Snack', onTap: () => context.go('/log')),
+                  _QuickActionChip(label: s.snack.split(' · ').first, onTap: () => context.go('/log')),
                   const SizedBox(width: AppSpacing.sm),
-                  _QuickActionChip(label: 'Dinner', onTap: () => context.go('/log')),
+                  _QuickActionChip(label: s.dinner.split(' · ').first, onTap: () => context.go('/log')),
                 ],
               ),
             ),
@@ -94,7 +98,60 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.go('/log'),
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+            ),
+            builder: (context) {
+              final s = AppStrings.of(context);
+              final theme = Theme.of(context);
+              return Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        child: Icon(Icons.restaurant, color: theme.colorScheme.onPrimaryContainer),
+                      ),
+                      title: Text(s.isTamil ? 'உணவு வகையை பதிவுசெய்' : 'Log Vegetable Meal'),
+                      subtitle: Text(s.isTamil ? 'காய்கறிகளைத் தேர்ந்தெடுத்து உணவு வகைகளைப் பரிந்துரைக்கச் செய்யவும்' : 'Search local vegetables & suggest recipes'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/log');
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: theme.colorScheme.secondaryContainer,
+                        child: Icon(Icons.qr_code_scanner, color: theme.colorScheme.onSecondaryContainer),
+                      ),
+                      title: Text(s.scanBarcode),
+                      subtitle: Text(s.isTamil ? 'பார்கோடு ஸ்கேன் செய்து உணவைச் சேர்க்கவும்' : 'Scan packaged products and log quickly'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/scanner');
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
         child: const Icon(Icons.add),
       ),
     );

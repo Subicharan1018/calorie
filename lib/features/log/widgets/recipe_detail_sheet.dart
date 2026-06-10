@@ -3,6 +3,7 @@ import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/features/log/models/recipe.dart';
 import 'package:kalori/shared/widgets/stat_chip.dart';
 import 'package:kalori/features/log/widgets/meal_log_quantity_sheet.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class RecipeDetailSheet extends StatefulWidget {
   final Recipe recipe;
@@ -30,6 +31,7 @@ class _RecipeDetailSheetState extends State<RecipeDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppStrings.of(context);
     final multiplier = _servingGrams / 100;
 
     return DraggableScrollableSheet(
@@ -99,8 +101,8 @@ class _RecipeDetailSheetState extends State<RecipeDetailSheet> {
                           const SizedBox(width: 8),
                           Text(
                             widget.recipe.isAiGenerated 
-                                ? 'AI-generated, verify before use' 
-                                : 'ICMR-NIN verified',
+                                ? s.aiGenerated 
+                                : s.icmrVerified,
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: widget.recipe.isAiGenerated ? Colors.amber[900] : Colors.green[900],
                             ),
@@ -111,7 +113,7 @@ class _RecipeDetailSheetState extends State<RecipeDetailSheet> {
                     const SizedBox(height: AppSpacing.xl),
 
                     // Serving Size Stepper
-                    Text('Serving Size', style: theme.textTheme.titleMedium),
+                    Text(s.servingSize, style: theme.textTheme.titleMedium),
                     const SizedBox(height: AppSpacing.sm),
                     SegmentedButton<int>(
                       segments: const [
@@ -129,16 +131,32 @@ class _RecipeDetailSheetState extends State<RecipeDetailSheet> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _BigMacroStat(label: 'Calories', value: '${(widget.recipe.kcalPer100g * multiplier).toInt()}', color: theme.colorScheme.onSurface),
-                        _BigMacroStat(label: 'Protein', value: '${(widget.recipe.proteinPer100g * multiplier).toStringAsFixed(1)}g', color: theme.colorScheme.secondary),
-                        _BigMacroStat(label: 'Carbs', value: '${(widget.recipe.carbsPer100g * multiplier).toStringAsFixed(1)}g', color: theme.colorScheme.primary),
-                        _BigMacroStat(label: 'Fat', value: '${(widget.recipe.fatPer100g * multiplier).toStringAsFixed(1)}g', color: Colors.amber[700]!),
+                        _BigMacroStat(
+                          label: s.isTamil ? 'கலோரி' : 'Calories',
+                          value: '${(widget.recipe.kcalPer100g * multiplier).toInt()}',
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        _BigMacroStat(
+                          label: s.protein,
+                          value: '${(widget.recipe.proteinPer100g * multiplier).toStringAsFixed(1)}g',
+                          color: theme.colorScheme.secondary,
+                        ),
+                        _BigMacroStat(
+                          label: s.carbs,
+                          value: '${(widget.recipe.carbsPer100g * multiplier).toStringAsFixed(1)}g',
+                          color: theme.colorScheme.primary,
+                        ),
+                        _BigMacroStat(
+                          label: s.fat,
+                          value: '${(widget.recipe.fatPer100g * multiplier).toStringAsFixed(1)}g',
+                          color: const Color(0xFFD47A22),
+                        ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     
                     // Ingredients
-                    Text('Ingredients (per 100g)', style: theme.textTheme.titleMedium),
+                    Text(s.isTamil ? 'தேவையான காய்கறிகள் (100கிராமுக்கு)' : 'Ingredients (per 100g)', style: theme.textTheme.titleMedium),
                     const SizedBox(height: AppSpacing.sm),
                     Wrap(
                       spacing: 8,
@@ -148,15 +166,35 @@ class _RecipeDetailSheetState extends State<RecipeDetailSheet> {
                     const SizedBox(height: AppSpacing.xl),
 
                     // ICMR Nutrition Table (Collapsible)
-                    const ExpansionTile(
-                      title: Text('Full Nutrition Data'),
+                    ExpansionTile(
+                      title: Text(s.isTamil ? 'முழு ஊட்டச்சத்து விபரம் (ICMR)' : 'Full Nutrition Data (ICMR)'),
                       tilePadding: EdgeInsets.zero,
                       children: [
-                        _NutritionRow(label: 'Iron', value: '1.2mg', percent: 0.15),
-                        _NutritionRow(label: 'Calcium', value: '45mg', percent: 0.05),
-                        _NutritionRow(label: 'Phosphorus', value: '80mg', percent: 0.11),
-                        _NutritionRow(label: 'Vitamin C', value: '12mg', percent: 0.20),
-                        _NutritionRow(label: 'Fibre', value: '3.4g', percent: 0.13),
+                        _NutritionRow(
+                          label: s.iron,
+                          value: '${(widget.recipe.iron * multiplier).toStringAsFixed(1)} mg',
+                          percent: (widget.recipe.iron * multiplier / 17.0).clamp(0.0, 1.0),
+                        ),
+                        _NutritionRow(
+                          label: s.calcium,
+                          value: '${(widget.recipe.calcium * multiplier).toStringAsFixed(0)} mg',
+                          percent: (widget.recipe.calcium * multiplier / 1000.0).clamp(0.0, 1.0),
+                        ),
+                        _NutritionRow(
+                          label: s.isTamil ? 'பாஸ்பரஸ் (Phosphorus)' : 'Phosphorus',
+                          value: '${(widget.recipe.phosphorus * multiplier).toStringAsFixed(0)} mg',
+                          percent: (widget.recipe.phosphorus * multiplier / 600.0).clamp(0.0, 1.0),
+                        ),
+                        _NutritionRow(
+                          label: s.vitaminC,
+                          value: '${(widget.recipe.vitaminC * multiplier).toStringAsFixed(0)} mg',
+                          percent: (widget.recipe.vitaminC * multiplier / 80.0).clamp(0.0, 1.0),
+                        ),
+                        _NutritionRow(
+                          label: s.fibre,
+                          value: '${(widget.recipe.fibre * multiplier).toStringAsFixed(1)} g',
+                          percent: (widget.recipe.fibre * multiplier / 30.0).clamp(0.0, 1.0),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 80),
@@ -171,7 +209,7 @@ class _RecipeDetailSheetState extends State<RecipeDetailSheet> {
                     minimumSize: const Size(double.infinity, 56),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
                   ),
-                  child: const Text('Log This Meal', style: TextStyle(fontSize: 16)),
+                  child: Text(s.logThisMeal, style: const TextStyle(fontSize: 16)),
                 ),
               ),
             ],
@@ -239,7 +277,7 @@ class _NutritionRow extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           SizedBox(
-            width: 48,
+            width: 64,
             child: Text(value, textAlign: TextAlign.right, style: theme.textTheme.labelMedium),
           ),
         ],

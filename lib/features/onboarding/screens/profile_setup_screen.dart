@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/core/providers/shared_prefs_provider.dart';
 import 'package:kalori/core/utils/tdee_calculator.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -31,6 +32,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppStrings.of(context);
     
     final tdee = TDEECalculator.mifflinStJeor(
       weightKg: _weight,
@@ -49,7 +51,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Set up your profile'),
+        title: Text(s.isTamil ? 'சுயவிவரம் அமைத்தல்' : 'Set up your profile'),
         backgroundColor: theme.colorScheme.surface,
       ),
       body: SafeArea(
@@ -63,19 +65,19 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Gender', style: theme.textTheme.titleMedium),
+              Text(s.isTamil ? 'பாலினம்' : 'Gender', style: theme.textTheme.titleMedium),
               const SizedBox(height: AppSpacing.sm),
               SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'male', label: Text('Male')),
-                  ButtonSegment(value: 'female', label: Text('Female')),
+                segments: [
+                  ButtonSegment(value: 'male', label: Text(s.isTamil ? 'ஆண்' : 'Male')),
+                  ButtonSegment(value: 'female', label: Text(s.isTamil ? 'பெண்' : 'Female')),
                 ],
                 selected: {_gender},
                 onSelectionChanged: (val) => setState(() => _gender = val.first),
               ),
               const SizedBox(height: AppSpacing.lg),
               
-              Text('Age: $_age', style: theme.textTheme.titleMedium),
+              Text(s.isTamil ? 'வயது: $_age' : 'Age: $_age', style: theme.textTheme.titleMedium),
               Slider(
                 value: _age.toDouble(),
                 min: 15,
@@ -86,7 +88,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
               
-              Text('Height: ${_height.toInt()} cm', style: theme.textTheme.titleMedium),
+              Text(s.isTamil ? 'உயரம்: ${_height.toInt()} செ.மீ' : 'Height: ${_height.toInt()} cm', style: theme.textTheme.titleMedium),
               Slider(
                 value: _height,
                 min: 120,
@@ -97,7 +99,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
               
-              Text('Weight: ${_weight.toStringAsFixed(1)} kg', style: theme.textTheme.titleMedium),
+              Text(s.isTamil ? 'எடை: ${_weight.toStringAsFixed(1)} கி.கி' : 'Weight: ${_weight.toStringAsFixed(1)} kg', style: theme.textTheme.titleMedium),
               Slider(
                 value: _weight,
                 min: 40,
@@ -108,30 +110,31 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
               
-              Text('Activity Level', style: theme.textTheme.titleMedium),
+              Text(s.activityLevel, style: theme.textTheme.titleMedium),
               const SizedBox(height: AppSpacing.sm),
               DropdownMenu<double>(
                 initialSelection: _activityMult,
+                width: MediaQuery.of(context).size.width - 2 * AppSpacing.xl,
                 onSelected: (val) {
                   if (val != null) setState(() => _activityMult = val);
                 },
-                dropdownMenuEntries: const [
-                  DropdownMenuEntry(value: 1.2, label: 'Sedentary'),
-                  DropdownMenuEntry(value: 1.375, label: 'Light'),
-                  DropdownMenuEntry(value: 1.55, label: 'Moderate'),
-                  DropdownMenuEntry(value: 1.725, label: 'Active'),
-                  DropdownMenuEntry(value: 1.9, label: 'Very Active'),
+                dropdownMenuEntries: [
+                  DropdownMenuEntry(value: 1.2, label: s.sedentary),
+                  DropdownMenuEntry(value: 1.375, label: s.light),
+                  DropdownMenuEntry(value: 1.55, label: s.moderate),
+                  DropdownMenuEntry(value: 1.725, label: s.active),
+                  DropdownMenuEntry(value: 1.9, label: s.veryActive),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              Text('Goal', style: theme.textTheme.titleMedium),
+              Text(s.isTamil ? 'இலக்கு' : 'Goal', style: theme.textTheme.titleMedium),
               const SizedBox(height: AppSpacing.sm),
               SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'lose_0.5', label: Text('-0.5 kg/wk')),
-                  ButtonSegment(value: 'lose_0.25', label: Text('-0.25 kg/wk')),
-                  ButtonSegment(value: 'maintain', label: Text('Maintain')),
+                segments: [
+                  ButtonSegment(value: 'lose_0.5', label: Text(s.isTamil ? '-0.5 கி.கி/வாரம்' : '-0.5 kg/wk')),
+                  ButtonSegment(value: 'lose_0.25', label: Text(s.isTamil ? '-0.25 கி.கி/வாரம்' : '-0.25 kg/wk')),
+                  ButtonSegment(value: 'maintain', label: Text(s.isTamil ? 'பராமரிப்பு' : 'Maintain')),
                 ],
                 selected: {_weightGoal},
                 onSelectionChanged: (val) => setState(() => _weightGoal = val.first),
@@ -149,14 +152,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 child: Column(
                   children: [
                     Text(
-                      'Your daily target: ${targetKcal.toInt()} kcal',
+                      s.isTamil ? 'உங்களது தினசரி இலக்கு: ${targetKcal.toInt()} கலோரி' : 'Your daily target: ${targetKcal.toInt()} kcal',
                       style: theme.textTheme.titleLarge?.copyWith(
                         color: theme.colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Deficit: -${deficitGoal.toInt()} kcal',
+                      s.isTamil ? 'பற்றாக்குறை இலக்கு: -${deficitGoal.toInt()} கலோரி' : 'Deficit target: -${deficitGoal.toInt()} kcal',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurface,
                       ),
@@ -179,7 +182,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               borderRadius: BorderRadius.circular(AppRadius.button),
             ),
           ),
-          child: const Text('Save & Continue', style: TextStyle(fontSize: 16)),
+          child: Text(s.saveChanges, style: const TextStyle(fontSize: 16)),
         ),
       ),
     );

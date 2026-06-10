@@ -1,17 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kalori/core/models/weight_log.dart';
-
-class DailyCalorieLog {
-  final DateTime date;
-  final int consumedKcal;
-  final int targetKcal;
-
-  const DailyCalorieLog({
-    required this.date,
-    required this.consumedKcal,
-    required this.targetKcal,
-  });
-}
+import 'package:kalori/core/models/daily_calorie_log.dart';
+import 'package:kalori/mock/mock_data.dart';
 
 class TrendsState {
   final List<DailyCalorieLog> last7Days;
@@ -28,22 +18,17 @@ class TrendsState {
 class TrendsNotifier extends Notifier<TrendsState> {
   @override
   TrendsState build() {
-    final now = DateTime.now();
+    // Convert mockCalorieTrend (from mock_data.dart) to the DailyCalorieLog here
+    final convertedTrend = mockCalorieTrend.map((log) => DailyCalorieLog(
+      date: log.date,
+      consumedKcal: log.consumedKcal,
+      targetKcal: log.targetKcal,
+    )).toList();
+
     return TrendsState(
       goalWeight: 65.0,
-      last7Days: List.generate(7, (i) {
-        final daysAgo = 6 - i;
-        final date = now.subtract(Duration(days: daysAgo));
-        // Mock data: some under target, some over
-        final consumed = [1900, 2150, 1850, 2400, 2050, 1950, 2100][i];
-        return DailyCalorieLog(date: date, consumedKcal: consumed, targetKcal: 2100);
-      }),
-      weightHistory: [
-        WeightLog(id: '1', date: now.subtract(const Duration(days: 14)), weightKg: 73.6),
-        WeightLog(id: '2', date: now.subtract(const Duration(days: 10)), weightKg: 73.2),
-        WeightLog(id: '3', date: now.subtract(const Duration(days: 7)), weightKg: 72.8),
-        WeightLog(id: '4', date: now.subtract(const Duration(days: 3)), weightKg: 72.4),
-      ],
+      last7Days: convertedTrend,
+      weightHistory: List.from(mockWeightLogs),
     );
   }
 

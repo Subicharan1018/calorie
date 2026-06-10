@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kalori/core/theme/spacing.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class MicronutrientSnapshot extends StatelessWidget {
   const MicronutrientSnapshot({super.key});
@@ -7,6 +8,7 @@ class MicronutrientSnapshot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppStrings.of(context);
     
     return Card(
       elevation: AppElevation.none,
@@ -15,17 +17,17 @@ class MicronutrientSnapshot extends StatelessWidget {
         side: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: ExpansionTile(
-        title: const Text('Micronutrients'),
-        subtitle: const Text('Iron, Calcium, Vitamin C, Fibre'),
+        title: Text(s.micronutrients),
+        subtitle: Text('${s.iron.split(' (').first}, ${s.calcium.split(' (').first}, ${s.vitaminC.split(' (').first}, ${s.fibre.split(' (').first}'),
         childrenPadding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          _buildBar(context, 'Iron · இரும்பு', 0.4),
+          _buildBar(context, s.iron, 0.4),
           const SizedBox(height: AppSpacing.sm),
-          _buildBar(context, 'Calcium · கால்சியம்', 0.8),
+          _buildBar(context, s.calcium, 0.8),
           const SizedBox(height: AppSpacing.sm),
-          _buildBar(context, 'Vitamin C', 1.0),
+          _buildBar(context, s.vitaminC, 1.0),
           const SizedBox(height: AppSpacing.sm),
-          _buildBar(context, 'Fibre · நார்சத்து', 0.6),
+          _buildBar(context, s.fibre, 0.6),
         ],
       ),
     );
@@ -48,7 +50,7 @@ class MicronutrientSnapshot extends StatelessWidget {
           value: progress,
           backgroundColor: theme.colorScheme.outline.withValues(alpha: 0.1),
           valueColor: AlwaysStoppedAnimation(
-            progress >= 1.0 ? Colors.green : theme.colorScheme.primary,
+            progress >= 1.0 ? theme.colorScheme.secondary : theme.colorScheme.primary,
           ),
           borderRadius: BorderRadius.circular(4),
         ),

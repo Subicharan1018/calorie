@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/features/onboarding/widgets/onboarding_slide.dart';
+import 'package:kalori/widgets/illustrations/onboarding_vegetables_illustration.dart';
+import 'package:kalori/widgets/illustrations/onboarding_urli_illustration.dart';
+import 'package:kalori/widgets/illustrations/onboarding_ring_illustration.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -18,18 +21,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<OnboardingSlideData> _slides = [
     const OnboardingSlideData(
       title: 'Your vegetables.\nYour recipes.',
-      subtitle: 'Pick the local vegetables in your kitchen and let AI suggest South Indian recipes tailored for you.',
-      illustration: _PlaceholderIllustration(icon: Icons.grass, color: Colors.green),
+      subtitle: 'Pick the local vegetables in your kitchen and let AI suggest South South Indian recipes tailored for you.',
+      illustration: OnboardingVegetablesIllustration(),
     ),
     const OnboardingSlideData(
       title: 'Calories from your\nown kitchen.',
       subtitle: 'We use verified ICMR-NIN nutritional data so you know exactly what is in your sambar, poriyal, and kootu.',
-      illustration: _PlaceholderIllustration(icon: Icons.soup_kitchen, color: Colors.orange),
+      illustration: OnboardingUrliIllustration(),
     ),
     const OnboardingSlideData(
       title: 'Set your target.\nWe track the rest.',
       subtitle: 'Establish your daily calorie deficit based on your goals and easily visualize your progress every day.',
-      illustration: _PlaceholderIllustration(icon: Icons.track_changes, color: Colors.purple),
+      illustration: OnboardingRingIllustration(),
     ),
   ];
 
@@ -123,26 +126,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-// Placeholder illustration wrapper
-class _PlaceholderIllustration extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  const _PlaceholderIllustration({required this.icon, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 200,
-      height: 200,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, size: 80, color: color),
     );
   }
 }

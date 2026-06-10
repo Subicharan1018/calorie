@@ -4,6 +4,8 @@ import 'package:kalori/core/models/meal_log.dart';
 import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/shared/widgets/empty_state.dart';
 import 'package:kalori/shared/widgets/tamil_english_label.dart';
+import 'package:kalori/l10n/app_strings.dart';
+import 'package:kalori/widgets/illustrations/empty_thali_illustration.dart';
 
 class MealLogSummaryList extends ConsumerWidget {
   final List<MealLog> meals;
@@ -17,15 +19,17 @@ class MealLogSummaryList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final s = AppStrings.of(context);
+    
     if (meals.isEmpty) {
-      return const EmptyState(
-        headline: 'No meals logged yet',
-        subtext: 'Tap the + button to log your first meal today.',
-        illustration: Icon(Icons.restaurant, size: 64, color: Colors.grey),
+      return EmptyState(
+        headline: s.emptyMealsHeadline,
+        subtext: s.emptyMealsSub,
+        illustration: const EmptyThaliIllustration(size: 140),
       );
     }
-
-    final theme = Theme.of(context);
+    
     final groupedMeals = <MealType, List<MealLog>>{};
     for (final meal in meals) {
       groupedMeals.putIfAbsent(meal.mealType, () => []).add(meal);
@@ -58,11 +62,11 @@ class MealLogSummaryList extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        _getMealTypeName(type),
+                        _getMealTypeName(type, s),
                         style: theme.textTheme.titleMedium,
                       ),
                       Text(
-                        '$typeTotal kcal',
+                        s.isTamil ? '$typeTotal கலோரி' : '$typeTotal kcal',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: theme.colorScheme.primary,
                         ),
@@ -94,9 +98,9 @@ class MealLogSummaryList extends ConsumerWidget {
                                 tamilText: meal.tamilName!,
                               )
                             : Text(meal.recipeName),
-                        subtitle: Text('${meal.quantityGrams}g'),
+                        subtitle: Text(s.isTamil ? '${meal.quantityGrams} கிராம்' : '${meal.quantityGrams}g'),
                         trailing: Text(
-                          '${meal.kcal} kcal',
+                          s.isTamil ? '${meal.kcal} கலோரி' : '${meal.kcal} kcal',
                           style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -111,12 +115,12 @@ class MealLogSummaryList extends ConsumerWidget {
     );
   }
 
-  String _getMealTypeName(MealType type) {
+  String _getMealTypeName(MealType type, AppStrings s) {
     switch (type) {
-      case MealType.breakfast: return 'Breakfast · காலை உணவு';
-      case MealType.lunch: return 'Lunch · மதிய உணவு';
-      case MealType.snack: return 'Snack · சிற்றுண்டி';
-      case MealType.dinner: return 'Dinner · இரவு உணவு';
+      case MealType.breakfast: return s.breakfast;
+      case MealType.lunch: return s.lunch;
+      case MealType.snack: return s.snack;
+      case MealType.dinner: return s.dinner;
     }
   }
 }

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:kalori/core/models/weight_log.dart';
 import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/features/trends/providers/trends_provider.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class WeightLogSheet extends ConsumerStatefulWidget {
   const WeightLogSheet({super.key});
@@ -32,21 +33,48 @@ class _WeightLogSheetState extends ConsumerState<WeightLogSheet> {
       weightKg: _weight,
     );
     ref.read(trendsProvider.notifier).addWeightLog(log);
+    
+    // Show a floating confirmation SnackBar
+    final s = AppStrings.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          s.isTamil
+              ? 'எடை வெற்றிகரமாகப் பதிவு செய்யப்பட்டது'
+              : 'Weight logged successfully',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
     context.pop();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppStrings.of(context);
     final history = ref.watch(trendsProvider).weightHistory;
     
-    String lastLoggedText = 'No previous logs';
+    String lastLoggedText = s.isTamil ? 'முந்தைய பதிவுகள் இல்லை' : 'No previous logs';
     if (history.isNotEmpty) {
       final lastLog = history.last;
       final daysAgo = DateTime.now().difference(lastLog.date).inDays;
-      final timeAgoText = daysAgo == 0 ? 'today' : daysAgo == 1 ? 'yesterday' : '$daysAgo days ago';
-      lastLoggedText = 'Last logged: ${lastLog.weightKg} kg ($timeAgoText)';
+      final String timeAgoText;
+      if (daysAgo == 0) {
+        timeAgoText = s.isTamil ? 'இன்று' : 'today';
+      } else if (daysAgo == 1) {
+        timeAgoText = s.isTamil ? 'நேற்று' : 'yesterday';
+      } else {
+        timeAgoText = s.isTamil ? '$daysAgo நாட்களுக்கு முன்பு' : '$daysAgo days ago';
+      }
+      
+      lastLoggedText = s.isTamil
+          ? 'கடைசி பதிவு: ${lastLog.weightKg} கி.கி ($timeAgoText)'
+          : 'Last logged: ${lastLog.weightKg} kg ($timeAgoText)';
     }
+
+    final localeStr = s.locale.toString();
 
     return Container(
       decoration: BoxDecoration(
@@ -60,13 +88,13 @@ class _WeightLogSheetState extends ConsumerState<WeightLogSheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                DateFormat('EEEE, d MMMM').format(DateTime.now()),
+                DateFormat('EEEE, d MMMM', localeStr).format(DateTime.now()),
                 style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.outline),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Log your weight',
-                style: theme.textTheme.titleLarge,
+                s.isTamil ? 'உங்களது எடையை பதிவு செய்யவும்' : 'Log your weight',
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: AppSpacing.xl),
               
@@ -84,7 +112,7 @@ class _WeightLogSheetState extends ConsumerState<WeightLogSheet> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
-                    'kg',
+                    s.isTamil ? 'கி.கி' : 'kg',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       color: theme.colorScheme.outline,
                     ),
@@ -114,7 +142,7 @@ class _WeightLogSheetState extends ConsumerState<WeightLogSheet> {
                   minimumSize: const Size(double.infinity, 56),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
                 ),
-                child: const Text('Save Weight', style: TextStyle(fontSize: 16)),
+                child: Text(s.isTamil ? 'எடையை சேமிக்கவும்' : 'Save Weight', style: const TextStyle(fontSize: 16)),
               ),
             ],
           ),

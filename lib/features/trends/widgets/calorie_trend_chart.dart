@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:kalori/features/trends/providers/trends_provider.dart';
+import 'package:kalori/core/models/daily_calorie_log.dart';
 import 'package:intl/intl.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class CalorieTrendChart extends StatelessWidget {
   final List<DailyCalorieLog> logs;
@@ -11,10 +12,22 @@ class CalorieTrendChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = AppStrings.of(context);
     if (logs.isEmpty) return const SizedBox.shrink();
 
     final target = logs.first.targetKcal.toDouble();
     final maxY = (target * 1.5).ceilToDouble();
+
+    // Tamil weekdays short labels mapping
+    final Map<int, String> tamilShortDays = {
+      1: 'தி', // Mon
+      2: 'செ', // Tue
+      3: 'பு', // Wed
+      4: 'வி', // Thu
+      5: 'வெ', // Fri
+      6: 'ச',  // Sat
+      7: 'ஞ',  // Sun
+    };
 
     return AspectRatio(
       aspectRatio: 1.5,
@@ -29,9 +42,13 @@ class CalorieTrendChart extends StatelessWidget {
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final log = logs[groupIndex];
                 final diff = log.consumedKcal - log.targetKcal;
-                final diffText = diff > 0 ? '+$diff kcal' : '$diff kcal';
+                final diffText = diff > 0 
+                    ? (s.isTamil ? '+$diff கலோரி' : '+$diff kcal') 
+                    : (s.isTamil ? '$diff கலோரி' : '$diff kcal');
                 return BarTooltipItem(
-                  '${log.consumedKcal} kcal\n$diffText',
+                  s.isTamil 
+                      ? '${log.consumedKcal} கலோரி\n$diffText'
+                      : '${log.consumedKcal} kcal\n$diffText',
                   theme.textTheme.labelMedium!.copyWith(
                     color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
@@ -48,12 +65,14 @@ class CalorieTrendChart extends StatelessWidget {
                 getTitlesWidget: (value, meta) {
                   if (value.toInt() < 0 || value.toInt() >= logs.length) return const SizedBox.shrink();
                   final date = logs[value.toInt()].date;
-                  final formatter = DateFormat('E');
+                  final dayLabel = s.isTamil 
+                      ? (tamilShortDays[date.weekday] ?? '') 
+                      : DateFormat('E').format(date).substring(0, 1);
                   return Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: Text(
-                      formatter.format(date).substring(0, 1), // M, T, W, etc
-                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                      dayLabel,
+                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline, fontWeight: FontWeight.bold),
                     ),
                   );
                 },
@@ -83,10 +102,10 @@ class CalorieTrendChart extends StatelessWidget {
             final log = logs[index];
             final consumed = log.consumedKcal.toDouble();
             
-            Color barColor = Colors.green; // under target
+            Color barColor = theme.colorScheme.primary; // under target
             if (consumed > target) {
               if (consumed <= target * 1.1) {
-                barColor = Colors.amber; // 0-10% over
+                barColor = theme.colorScheme.secondary; // 0-10% over
               } else {
                 barColor = theme.colorScheme.error; // >10% over
               }

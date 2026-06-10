@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:kalori/core/models/daily_summary.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class DeficitRingWidget extends StatefulWidget {
   final DailySummary summary;
@@ -39,7 +40,7 @@ class _DeficitRingWidgetState extends State<DeficitRingWidget> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final int remaining = widget.summary.targetKcal - widget.summary.consumedKcal;
+    final s = AppStrings.of(context);
     
     return AspectRatio(
       aspectRatio: 1.2,
@@ -56,31 +57,43 @@ class _DeficitRingWidgetState extends State<DeficitRingWidget> with SingleTicker
                   progress: _animation.value,
                   carbsColor: theme.colorScheme.primary,
                   proteinColor: theme.colorScheme.secondary,
-                  fatColor: Colors.amber, // Highlight fat differently from brand colors
+                  fatColor: const Color(0xFFD47A22), // Warm terracotta/rust for fat to avoid gold/green collision
                   trackColor: theme.colorScheme.outline.withValues(alpha: 0.1),
                 ),
               );
             },
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${remaining > 0 ? remaining : 0}',
-                style: theme.textTheme.displayMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: remaining < 0 ? theme.colorScheme.error : theme.colorScheme.primary,
-                  height: 1,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                remaining < 0 ? 'over target' : 'remaining',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.outline,
-                ),
-              ),
-            ],
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              final animatedValue = (widget.summary.consumedKcal * _animation.value).toInt();
+              final animatedRemaining = widget.summary.targetKcal - animatedValue;
+              final displayVal = animatedRemaining > 0 ? animatedRemaining : 0;
+              final isOver = animatedRemaining < 0;
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isOver ? '${-animatedRemaining}' : '$displayVal',
+                    style: theme.textTheme.displayMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isOver ? theme.colorScheme.error : theme.colorScheme.primary,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isOver
+                        ? (s.isTamil ? 'அதிகப்படியானது' : 'over target')
+                        : (s.isTamil ? 'மீதமுள்ளது' : 'remaining'),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

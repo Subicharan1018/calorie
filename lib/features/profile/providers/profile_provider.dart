@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kalori/core/utils/tdee_calculator.dart';
+import 'package:kalori/mock/mock_data.dart';
 
 class ProfileState {
   final String name;
@@ -62,14 +63,14 @@ class ProfileState {
 class ProfileNotifier extends Notifier<ProfileState> {
   @override
   ProfileState build() {
-    return const ProfileState(
-      name: 'Subi',
-      gender: 'male',
-      age: 30,
-      weight: 72.4,
-      height: 170.0,
-      activityMult: 1.2,
-      deficitGoal: 500,
+    return ProfileState(
+      name: mockUserProfile.name,
+      gender: mockUserProfile.gender,
+      age: mockUserProfile.age,
+      weight: mockUserProfile.weightKg,
+      height: mockUserProfile.heightCm,
+      activityMult: 1.55, // moderate
+      deficitGoal: mockUserProfile.deficitTarget,
       isDarkMode: false,
       language: 'en',
     );
@@ -79,6 +80,22 @@ class ProfileNotifier extends Notifier<ProfileState> {
   void updateDeficit(int deficit) => state = state.copyWith(deficitGoal: deficit);
   void toggleTheme(bool isDark) => state = state.copyWith(isDarkMode: isDark);
   void updateLanguage(String lang) => state = state.copyWith(language: lang);
+  
+  void updateProfile({
+    String? name,
+    String? gender,
+    int? age,
+    double? weight,
+    double? height,
+  }) {
+    state = state.copyWith(
+      name: name,
+      gender: gender,
+      age: age,
+      weight: weight,
+      height: height,
+    );
+  }
 }
 
 final profileProvider = NotifierProvider<ProfileNotifier, ProfileState>(() => ProfileNotifier());

@@ -4,6 +4,7 @@ class Vegetable {
   final String tamilName;
   final String category;
   final int kcalPer100g;
+  final String? icmrCode;
 
   const Vegetable({
     required this.id,
@@ -11,5 +12,6 @@ class Vegetable {
     required this.tamilName,
     required this.category,
     required this.kcalPer100g,
+    this.icmrCode,
   });
 }

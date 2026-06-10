@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:kalori/core/models/weight_log.dart';
 import 'package:intl/intl.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class WeightProgressChart extends StatelessWidget {
   final List<WeightLog> history;
@@ -14,6 +15,7 @@ class WeightProgressChart extends StatelessWidget {
     if (history.isEmpty) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
+    final s = AppStrings.of(context);
     final minWeight = history.map((w) => w.weightKg).reduce((a, b) => a < b ? a : b);
     final maxWeight = history.map((w) => w.weightKg).reduce((a, b) => a > b ? a : b);
     
@@ -80,11 +82,12 @@ class WeightProgressChart extends StatelessWidget {
                   final date = firstDate.add(Duration(days: value.toInt()));
                   // Only show label if it aligns somewhat, simplify for UI
                   if (value % 5 != 0 && value != points.last.x) return const SizedBox.shrink();
+                  final localeStr = s.locale.toString();
                   return Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: Text(
-                      DateFormat('d MMM').format(date),
-                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                      DateFormat('d MMM', localeStr).format(date),
+                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline, fontWeight: FontWeight.bold),
                     ),
                   );
                 },
@@ -107,15 +110,15 @@ class WeightProgressChart extends StatelessWidget {
             horizontalLines: [
               HorizontalLine(
                 y: goalWeight,
-                color: Colors.green,
+                color: theme.colorScheme.secondary,
                 strokeWidth: 2,
                 dashArray: [5, 5],
                 label: HorizontalLineLabel(
                   show: true,
                   alignment: Alignment.topRight,
                   padding: const EdgeInsets.only(right: 8, bottom: 4),
-                  style: theme.textTheme.labelSmall?.copyWith(color: Colors.green),
-                  labelResolver: (line) => 'Goal ${line.y}kg',
+                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.secondary, fontWeight: FontWeight.bold),
+                  labelResolver: (line) => s.isTamil ? 'இலக்கு ${line.y}கி.கி' : 'Goal ${line.y}kg',
                 ),
               ),
             ],

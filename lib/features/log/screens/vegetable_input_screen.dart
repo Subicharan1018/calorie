@@ -7,6 +7,7 @@ import 'package:kalori/shared/widgets/app_scaffold.dart';
 import 'package:kalori/shared/widgets/empty_state.dart';
 import 'package:kalori/shared/widgets/tamil_english_label.dart';
 import 'package:kalori/features/log/providers/vegetable_search_provider.dart';
+import 'package:kalori/l10n/app_strings.dart';
 
 class VegetableInputScreen extends ConsumerWidget {
   const VegetableInputScreen({super.key});
@@ -14,29 +15,46 @@ class VegetableInputScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final s = AppStrings.of(context);
     final searchResults = ref.watch(searchResultsProvider);
     final selectedVegetables = ref.watch(selectedVegetablesProvider);
 
     return AppScaffold(
-      title: 'What vegetables do you have?',
-      subtitle: 'We\'ll find South Indian recipes that match',
+      title: s.whatVegetablesDoYouHave,
+      subtitle: s.wellFindRecipes,
       body: Column(
         children: [
-          // Sticky top Search Bar
+          // Sticky top Search Bar Row with Scan Barcode button
           Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search in English or Tamil...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainer,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.button),
-                  borderSide: BorderSide.none,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: s.searchVegetables,
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceContainer,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (val) => ref.read(vegetableSearchQueryProvider.notifier).state = val,
+                  ),
                 ),
-              ),
-              onChanged: (val) => ref.read(vegetableSearchQueryProvider.notifier).state = val,
+                const SizedBox(width: AppSpacing.sm),
+                IconButton.outlined(
+                  onPressed: () => context.push('/scanner'),
+                  style: IconButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                    ),
+                  ),
+                  icon: const Icon(Icons.qr_code_scanner),
+                ),
+              ],
             ),
           ),
           
@@ -52,7 +70,7 @@ class VegetableInputScreen extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final veg = selectedVegetables[index];
                   return Chip(
-                    label: Text(veg.englishName),
+                    label: Text(s.isTamil ? veg.tamilName.split(' (').first : veg.englishName),
                     deleteIcon: const Icon(Icons.close, size: 16),
                     onDeleted: () {
                       ref.read(selectedVegetablesProvider.notifier).update((state) {
@@ -69,16 +87,16 @@ class VegetableInputScreen extends ConsumerWidget {
           // Search Results List
           Expanded(
             child: searchResults.isEmpty && ref.watch(vegetableSearchQueryProvider).isEmpty
-                ? const EmptyState(
-                    headline: 'Start searching',
-                    subtext: 'Search for a vegetable to add it to your kitchen list.',
-                    illustration: Icon(Icons.shopping_basket, size: 64, color: Colors.grey),
+                ? EmptyState(
+                    headline: s.isTamil ? 'தேடத் தொடங்கவும்' : 'Start searching',
+                    subtext: s.searchAndAddAbove,
+                    illustration: Icon(Icons.shopping_basket, size: 64, color: theme.colorScheme.outline),
                   )
                 : searchResults.isEmpty
-                    ? const EmptyState(
-                        headline: 'No results found',
-                        subtext: 'Try searching by the vegetable\'s common name.',
-                        illustration: Icon(Icons.search_off, size: 64, color: Colors.grey),
+                    ? EmptyState(
+                        headline: s.isTamil ? 'முடிவுகள் எதுவும் இல்லை' : 'No results found',
+                        subtext: s.emptySearchResult,
+                        illustration: Icon(Icons.search_off, size: 64, color: theme.colorScheme.outline),
                       )
                     : ListView.builder(
                         itemCount: searchResults.length,
@@ -94,7 +112,9 @@ class VegetableInputScreen extends ConsumerWidget {
                               tamilText: veg.tamilName,
                             ),
                             trailing: Text(
-                              '${veg.kcalPer100g} kcal/100g',
+                              s.isTamil
+                                  ? '${veg.kcalPer100g} கலோரி/100கி'
+                                  : '${veg.kcalPer100g} kcal/100g',
                               style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
                             ),
                             onTap: () {
@@ -124,12 +144,14 @@ class VegetableInputScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${selectedVegetables.length} selected',
+                  s.isTamil
+                      ? '${selectedVegetables.length} தேர்ந்தெடுக்கப்பட்டுள்ளது'
+                      : '${selectedVegetables.length} selected',
                   style: theme.textTheme.titleMedium,
                 ),
                 FilledButton(
                   onPressed: selectedVegetables.isEmpty ? null : () => context.push('/log/recipes'),
-                  child: const Text('Find Recipes →'),
+                  child: Text(s.findRecipes),
                 ),
               ],
             ),
