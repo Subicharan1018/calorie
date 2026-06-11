@@ -1,43 +1,30 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:kalori/core/models/meal_log.dart';
 import 'package:kalori/core/models/daily_summary.dart';
+import 'package:kalori/api/api_client.dart';
+import 'package:kalori/features/profile/providers/profile_provider.dart';
 
-class DashboardNotifier extends Notifier<DailySummary> {
+class DashboardNotifier extends AsyncNotifier<DailySummary> {
   @override
-  DailySummary build() {
-    return const DailySummary(
-      targetKcal: 2100, // Hardcoded for Phase 4 rendering
-      meals: [
-        MealLog(
-          id: '1',
-          recipeName: 'Idli with Sambar',
-          tamilName: 'இட்லி சாம்பார்',
-          quantityGrams: 250,
-          kcal: 320,
-          proteinG: 12.0,
-          carbsG: 60.0,
-          fatG: 4.0,
-          mealType: MealType.breakfast,
-        ),
-      ],
-    );
+  Future<DailySummary> build() async {
+    final profile = await ref.watch(profileProvider.future);
+    final summaryMap = await ApiClient.getTodaySummary();
+    return DailySummary.fromJson(summaryMap, profile.targetKcal);
   }
 
-  void addMeal(MealLog meal) {
-    state = DailySummary(
-      targetKcal: state.targetKcal,
-      meals: [...state.meals, meal],
-    );
-  }
-
-  void deleteMeal(String id) {
-    state = DailySummary(
-      targetKcal: state.targetKcal,
-      meals: state.meals.where((m) => m.id != id).toList(),
-    );
+  Future<void> deleteMeal(String id) async {
+    final logId = int.tryParse(id);
+    if (logId == null) return;
+    
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await ApiClient.deleteLog(logId);
+      final profile = await ref.read(profileProvider.future);
+      final summaryMap = await ApiClient.getTodaySummary();
+      return DailySummary.fromJson(summaryMap, profile.targetKcal);
+    });
   }
 }
 
-final dashboardProvider = NotifierProvider<DashboardNotifier, DailySummary>(() {
+final dashboardProvider = AsyncNotifierProvider<DashboardNotifier, DailySummary>(() {
   return DashboardNotifier();
 });

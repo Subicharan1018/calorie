@@ -11,8 +11,6 @@ import 'package:kalori/widgets/skeletons/recipe_card_skeleton.dart';
 import 'package:kalori/widgets/illustrations/empty_kolam_illustration.dart';
 import 'package:kalori/l10n/app_strings.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:kalori/mock/mock_data.dart';
-import 'package:kalori/features/log/models/vegetable.dart';
 
 class RecipeSuggestionsScreen extends ConsumerStatefulWidget {
   const RecipeSuggestionsScreen({super.key});
@@ -138,17 +136,17 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: TamilEnglishLabel(
-                                      englishText: recipe.englishName,
-                                      tamilText: recipe.tamilName,
-                                      englishStyle: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                                    Expanded(
+                                      child: TamilEnglishLabel(
+                                        englishText: recipe.englishName,
+                                        tamilText: recipe.tamilName,
+                                        englishStyle: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                                      ),
                                     ),
-                                  ),
                                   Text(
                                     s.isTamil
-                                        ? '${recipe.kcalPer100g} கலோரி'
-                                        : '${recipe.kcalPer100g} kcal',
+                                        ? '${recipe.kcalPer100g} கலோரி/100கி'
+                                        : '${recipe.kcalPer100g} kcal/100g',
                                     style: theme.textTheme.titleLarge?.copyWith(
                                       color: theme.colorScheme.primary,
                                       fontWeight: FontWeight.w700,
@@ -173,11 +171,11 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
                               const SizedBox(height: AppSpacing.md),
                               Row(
                                 children: [
-                                  _MacroDot(color: theme.colorScheme.primary, label: '${s.carbs.substring(0, 1)}: ${recipe.carbsPer100g}g'),
+                                  _MacroDot(color: theme.colorScheme.primary, label: '${s.carbs.substring(0, 1)}: ${recipe.carbsPer100g.toStringAsFixed(1)}g'),
                                   const SizedBox(width: AppSpacing.sm),
-                                  _MacroDot(color: theme.colorScheme.secondary, label: '${s.protein.substring(0, 1)}: ${recipe.proteinPer100g}g'),
+                                  _MacroDot(color: theme.colorScheme.secondary, label: '${s.protein.substring(0, 1)}: ${recipe.proteinPer100g.toStringAsFixed(1)}g'),
                                   const SizedBox(width: AppSpacing.sm),
-                                  _MacroDot(color: const Color(0xFFD47A22), label: '${s.fat.substring(0, 1)}: ${recipe.fatPer100g}g'),
+                                  _MacroDot(color: const Color(0xFFD47A22), label: '${s.fat.substring(0, 1)}: ${recipe.fatPer100g.toStringAsFixed(1)}g'),
                                 ],
                               ),
                               const SizedBox(height: AppSpacing.md),
@@ -185,14 +183,31 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
                                 spacing: 4,
                                 runSpacing: 4,
                                 children: recipe.matchedVegetableNames.map((name) {
-                                  // Find translation if available
                                   String displayName = name;
                                   if (s.isTamil) {
-                                    final vegItem = mockVegetables.firstWhere(
-                                      (v) => v.englishName.toLowerCase() == name.toLowerCase(),
-                                      orElse: () => Vegetable(id: '', englishName: name, tamilName: name, category: '', kcalPer100g: 0),
-                                    );
-                                    displayName = vegItem.tamilName.split(' (').first;
+                                    final Map<String, String> vegTranslations = {
+                                      'drumstick': 'முருங்கைக்காய்',
+                                      'raw banana': 'வாழைக்காய்',
+                                      'ash gourd': 'சாம்பல் பூசணி',
+                                      'banana flower': 'வாழைப்பூ',
+                                      'yam': 'சேனைக்கிழங்கு',
+                                      'snake gourd': 'புடலங்காய்',
+                                      'cluster beans': 'கொத்தவரங்காய்',
+                                      'brinjal': 'கத்திரிக்காய்',
+                                      'spinach': 'பசலைக்கீரை',
+                                      'bitter gourd': 'பாகற்காய்',
+                                      'carrot': 'கேரட்',
+                                      'ladies finger': 'வெண்டைக்காய்',
+                                      'potato': 'உருளைக்கிழங்கு',
+                                      'broad beans': 'அவரைக்காய்',
+                                      'tapioca': 'மரவள்ளிக்கிழங்கு',
+                                      'cabbage': 'முட்டைக்கோஸ்',
+                                      'beetroot': 'பீட்ரூட்',
+                                      'ridge gourd': 'பீர்க்கங்காய்',
+                                      'ivy gourd': 'கோவைக்காய்',
+                                      'bottle gourd': 'சுரைக்காய்',
+                                    };
+                                    displayName = vegTranslations[name.toLowerCase()] ?? name;
                                   }
                                   return Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

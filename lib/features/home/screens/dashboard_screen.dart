@@ -6,6 +6,7 @@ import 'package:kalori/features/home/providers/dashboard_provider.dart';
 import 'package:kalori/features/home/widgets/deficit_ring.dart';
 import 'package:kalori/features/home/widgets/meal_log_summary.dart';
 import 'package:kalori/features/home/widgets/micronutrient_snapshot.dart';
+import 'package:kalori/features/home/widgets/food_recommendations.dart';
 import 'package:kalori/shared/widgets/app_scaffold.dart';
 import 'package:kalori/shared/widgets/stat_chip.dart';
 import 'package:intl/intl.dart';
@@ -16,20 +17,19 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(dashboardProvider);
+    final summaryAsync = ref.watch(dashboardProvider);
     final today = DateTime.now();
     final s = AppStrings.of(context);
     final formatter = DateFormat('EEEE, d MMM');
     
-    // Quick translation map for today's weekday in Tamil
     final Map<int, String> tamilDays = {
-      1: 'திங்கள்', // Mon
-      2: 'செவ்வாய்', // Tue
-      3: 'புதன்', // Wed
-      4: 'வியாழன்', // Thu
-      5: 'வெள்ளி', // Fri
-      6: 'சனி', // Sat
-      7: 'ஞாயிறு', // Sun
+      1: 'திங்கள்',
+      2: 'செவ்வாய்',
+      3: 'புதன்',
+      4: 'வியாழன்',
+      5: 'வெள்ளி',
+      6: 'சனி',
+      7: 'ஞாயிறு',
     };
     final tamilDay = tamilDays[today.weekday] ?? '';
 
@@ -38,64 +38,86 @@ class DashboardScreen extends ConsumerWidget {
       subtitle: s.isTamil
           ? '$tamilDay, ${today.day} ${DateFormat('MMM').format(today)}'
           : formatter.format(today),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 100),
-        child: Column(
-          children: [
-            // Section A — Hero Deficit Ring
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-              child: DeficitRingWidget(summary: summary),
-            ),
-            // Macros summary below ring
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      body: summaryAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('${s.apiError}: $err', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(dashboardProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (summary) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 100),
+            child: Column(
               children: [
-                StatChip(label: s.carbs, value: '${summary.consumedCarbs.toInt()}g', color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: AppSpacing.sm),
-                StatChip(label: s.protein, value: '${summary.consumedProtein.toInt()}g', color: Theme.of(context).colorScheme.secondary),
-                const SizedBox(width: AppSpacing.sm),
-                StatChip(label: s.fat, value: '${summary.consumedFat.toInt()}g', color: const Color(0xFFD47A22)),
+                // Section A — Hero Deficit Ring
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: DeficitRingWidget(summary: summary),
+                ),
+                // Macros summary below ring
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    StatChip(label: s.carbs, value: '${summary.consumedCarbs.toInt()}g', color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: AppSpacing.sm),
+                    StatChip(label: s.protein, value: '${summary.consumedProtein.toInt()}g', color: Theme.of(context).colorScheme.secondary),
+                    const SizedBox(width: AppSpacing.sm),
+                    StatChip(label: s.fat, value: '${summary.consumedFat.toInt()}g', color: const Color(0xFFD47A22)),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                
+                // Section C — Quick Actions
+                SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    children: [
+                      _QuickActionChip(label: s.breakfast.split(' · ').first, onTap: () => context.go('/log')),
+                      const SizedBox(width: AppSpacing.sm),
+                      _QuickActionChip(label: s.lunch.split(' · ').first, onTap: () => context.go('/log')),
+                      const SizedBox(width: AppSpacing.sm),
+                      _QuickActionChip(label: s.snack.split(' · ').first, onTap: () => context.go('/log')),
+                      const SizedBox(width: AppSpacing.sm),
+                      _QuickActionChip(label: s.dinner.split(' · ').first, onTap: () => context.go('/log')),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                
+                // Section B — Meal Log Summary
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: MealLogSummaryList(
+                    meals: summary.meals,
+                    onDelete: (id) => ref.read(dashboardProvider.notifier).deleteMeal(id),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
+                // Section E — Recommendations
+                const FoodRecommendationsWidget(),
+                const SizedBox(height: AppSpacing.lg),
+                
+                // Section D — Micronutrients
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: MicronutrientSnapshot(),
+                ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xl),
-            
-            // Section C — Quick Actions
-            SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                children: [
-                  _QuickActionChip(label: s.breakfast.split(' · ').first, onTap: () => context.go('/log')),
-                  const SizedBox(width: AppSpacing.sm),
-                  _QuickActionChip(label: s.lunch.split(' · ').first, onTap: () => context.go('/log')),
-                  const SizedBox(width: AppSpacing.sm),
-                  _QuickActionChip(label: s.snack.split(' · ').first, onTap: () => context.go('/log')),
-                  const SizedBox(width: AppSpacing.sm),
-                  _QuickActionChip(label: s.dinner.split(' · ').first, onTap: () => context.go('/log')),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            
-            // Section B — Meal Log Summary
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: MealLogSummaryList(
-                meals: summary.meals,
-                onDelete: (id) => ref.read(dashboardProvider.notifier).deleteMeal(id),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            
-            // Section D — Micronutrients
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: MicronutrientSnapshot(),
-            ),
-          ],
-        ),
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

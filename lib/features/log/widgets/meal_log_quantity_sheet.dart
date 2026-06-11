@@ -7,6 +7,7 @@ import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/features/home/providers/dashboard_provider.dart';
 import 'package:kalori/features/log/models/recipe.dart';
 import 'package:kalori/l10n/app_strings.dart';
+import 'package:kalori/api/api_client.dart';
 
 class MealLogQuantitySheet extends ConsumerStatefulWidget {
   final Recipe recipe;
@@ -25,6 +26,7 @@ class MealLogQuantitySheet extends ConsumerStatefulWidget {
 class _MealLogQuantitySheetState extends ConsumerState<MealLogQuantitySheet> {
   late double _grams;
   MealType _mealType = MealType.lunch;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -32,38 +34,51 @@ class _MealLogQuantitySheetState extends ConsumerState<MealLogQuantitySheet> {
     _grams = widget.initialGrams.toDouble();
   }
 
-  void _onConfirm() {
+  void _onConfirm() async {
     HapticFeedback.mediumImpact();
-    final multiplier = _grams / 100;
-    final log = MealLog(
-      id: DateTime.now().toIso8601String(),
-      recipeName: widget.recipe.englishName,
-      tamilName: widget.recipe.tamilName,
-      quantityGrams: _grams.toInt(),
-      kcal: (widget.recipe.kcalPer100g * multiplier).toInt(),
-      proteinG: widget.recipe.proteinPer100g * multiplier,
-      carbsG: widget.recipe.carbsPer100g * multiplier,
-      fatG: widget.recipe.fatPer100g * multiplier,
-      mealType: _mealType,
-    );
+    setState(() {
+      _isLoading = true;
+    });
 
-    ref.read(dashboardProvider.notifier).addMeal(log);
+    final servingsEaten = _grams / widget.recipe.gramsPerServing;
 
-    // Show a floating confirmation toast or SnackBar
-    final s = AppStrings.of(context);
-    final String recipeDisplay = s.isTamil ? widget.recipe.tamilName : widget.recipe.englishName;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          s.isTamil
-              ? '$recipeDisplay வெற்றிகரமாகப் பதிவு செய்யப்பட்டது'
-              : '$recipeDisplay logged successfully',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    try {
+      await ApiClient.logRecipe(
+        mealType: _mealType.name,
+        recipeId: widget.recipe.apiId,
+        servingsEaten: servingsEaten,
+      );
 
-    context.go('/home'); // Close sheet and go home
+      ref.invalidate(dashboardProvider);
+
+      if (mounted) {
+        final s = AppStrings.of(context);
+        final String recipeDisplay = s.isTamil ? widget.recipe.tamilName : widget.recipe.englishName;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              s.isTamil
+                  ? '$recipeDisplay வெற்றிகரமாகப் பதிவு செய்யப்பட்டது'
+                  : '$recipeDisplay logged successfully',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.go('/home'); // Close sheet and go home
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error logging meal: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -102,7 +117,7 @@ class _MealLogQuantitySheetState extends ConsumerState<MealLogQuantitySheet> {
                 min: 50,
                 max: 500,
                 divisions: 18, // 25g increments
-                onChanged: (val) {
+                onChanged: _isLoading ? null : (val) {
                   setState(() {
                     _grams = (val / 25).round() * 25.0; // snap to 25
                   });
@@ -129,7 +144,7 @@ class _MealLogQuantitySheetState extends ConsumerState<MealLogQuantitySheet> {
                   ButtonSegment(value: MealType.dinner, label: Text(s.dinner.split(' · ').first)),
                 ],
                 selected: {_mealType},
-                onSelectionChanged: (val) => setState(() => _mealType = val.first),
+                onSelectionChanged: _isLoading ? null : (val) => setState(() => _mealType = val.first),
                 style: SegmentedButton.styleFrom(
                   textStyle: const TextStyle(fontSize: 12),
                 ),
@@ -137,12 +152,18 @@ class _MealLogQuantitySheetState extends ConsumerState<MealLogQuantitySheet> {
               const SizedBox(height: AppSpacing.xl),
 
               FilledButton(
-                onPressed: _onConfirm,
+                onPressed: _isLoading ? null : _onConfirm,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(double.infinity, 56),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
                 ),
-                child: Text(s.isTamil ? 'பதிவை உறுதிசெய்' : 'Confirm Log', style: const TextStyle(fontSize: 16)),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                      )
+                    : Text(s.isTamil ? 'பதிவை உறுதிசெய்' : 'Confirm Log', style: const TextStyle(fontSize: 16)),
               ),
             ],
           ),

@@ -21,7 +21,7 @@ class _WeightLogSheetState extends ConsumerState<WeightLogSheet> {
   @override
   void initState() {
     super.initState();
-    final history = ref.read(trendsProvider).weightHistory;
+    final history = ref.read(trendsProvider).value?.weightHistory ?? [];
     _weight = history.isNotEmpty ? history.last.weightKg : 70.0;
   }
 
@@ -54,7 +54,7 @@ class _WeightLogSheetState extends ConsumerState<WeightLogSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final s = AppStrings.of(context);
-    final history = ref.watch(trendsProvider).weightHistory;
+    final history = ref.watch(trendsProvider).value?.weightHistory ?? [];
     
     String lastLoggedText = s.isTamil ? 'முந்தைய பதிவுகள் இல்லை' : 'No previous logs';
     if (history.isNotEmpty) {

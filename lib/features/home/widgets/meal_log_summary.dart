@@ -98,7 +98,7 @@ class MealLogSummaryList extends ConsumerWidget {
                                 tamilText: meal.tamilName!,
                               )
                             : Text(meal.recipeName),
-                        subtitle: Text(s.isTamil ? '${meal.quantityGrams} கிராம்' : '${meal.quantityGrams}g'),
+                        subtitle: Text(meal.portionDisplay(s)),
                         trailing: Text(
                           s.isTamil ? '${meal.kcal} கலோரி' : '${meal.kcal} kcal',
                           style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),

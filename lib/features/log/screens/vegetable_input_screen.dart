@@ -86,44 +86,57 @@ class VegetableInputScreen extends ConsumerWidget {
 
           // Search Results List
           Expanded(
-            child: searchResults.isEmpty && ref.watch(vegetableSearchQueryProvider).isEmpty
-                ? EmptyState(
+            child: searchResults.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Text('${s.apiError}: $err', style: TextStyle(color: theme.colorScheme.error)),
+                ),
+              ),
+              data: (results) {
+                if (results.isEmpty && ref.watch(vegetableSearchQueryProvider).isEmpty) {
+                  return EmptyState(
                     headline: s.isTamil ? 'தேடத் தொடங்கவும்' : 'Start searching',
                     subtext: s.searchAndAddAbove,
                     illustration: Icon(Icons.shopping_basket, size: 64, color: theme.colorScheme.outline),
-                  )
-                : searchResults.isEmpty
-                    ? EmptyState(
-                        headline: s.isTamil ? 'முடிவுகள் எதுவும் இல்லை' : 'No results found',
-                        subtext: s.emptySearchResult,
-                        illustration: Icon(Icons.search_off, size: 64, color: theme.colorScheme.outline),
-                      )
-                    : ListView.builder(
-                        itemCount: searchResults.length,
-                        itemBuilder: (context, index) {
-                          final veg = searchResults[index];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: theme.colorScheme.surfaceContainer,
-                              child: const Icon(Icons.grass, size: 16),
-                            ),
-                            title: TamilEnglishLabel(
-                              englishText: veg.englishName,
-                              tamilText: veg.tamilName,
-                            ),
-                            trailing: Text(
-                              s.isTamil
-                                  ? '${veg.kcalPer100g} கலோரி/100கி'
-                                  : '${veg.kcalPer100g} kcal/100g',
-                              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
-                            ),
-                            onTap: () {
-                              ref.read(selectedVegetablesProvider.notifier).update((state) => [...state, veg]);
-                              ref.read(vegetableSearchQueryProvider.notifier).state = ''; // clear search
-                            },
-                          );
-                        },
+                  );
+                }
+                if (results.isEmpty) {
+                  return EmptyState(
+                    headline: s.isTamil ? 'முடிவுகள் எதுவும் இல்லை' : 'No results found',
+                    subtext: s.emptySearchResult,
+                    illustration: Icon(Icons.search_off, size: 64, color: theme.colorScheme.outline),
+                  );
+                }
+                return ListView.builder(
+                  itemCount: results.length,
+                  itemBuilder: (context, index) {
+                    final veg = results[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: theme.colorScheme.surfaceContainer,
+                        child: const Icon(Icons.grass, size: 16),
                       ),
+                      title: TamilEnglishLabel(
+                        englishText: veg.englishName,
+                        tamilText: veg.tamilName,
+                      ),
+                      trailing: Text(
+                        s.isTamil
+                            ? '${veg.kcalPer100g} கலோரி/100கி'
+                            : '${veg.kcalPer100g} kcal/100g',
+                        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                      ),
+                      onTap: () {
+                        ref.read(selectedVegetablesProvider.notifier).update((state) => [...state, veg]);
+                        ref.read(vegetableSearchQueryProvider.notifier).state = ''; // clear search
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
           
           // Sticky Bottom Bar

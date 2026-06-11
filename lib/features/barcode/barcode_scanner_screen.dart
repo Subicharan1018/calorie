@@ -4,11 +4,47 @@ import 'package:go_router/go_router.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:kalori/core/models/meal_log.dart';
 import 'package:kalori/features/home/providers/dashboard_provider.dart';
-import 'package:kalori/mock/mock_data.dart';
 import 'package:kalori/l10n/app_strings.dart';
 import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/widgets/error_toast.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:kalori/api/api_client.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
+class BarcodeProduct {
+  final String barcode;
+  final String productName;
+  final String brand;
+  final int kcalPer100g;
+  final double protein;
+  final double carbs;
+  final double fat;
+  final String servingSize;
+
+  const BarcodeProduct({
+    required this.barcode,
+    required this.productName,
+    required this.brand,
+    required this.kcalPer100g,
+    required this.protein,
+    required this.carbs,
+    required this.fat,
+    required this.servingSize,
+  });
+
+  factory BarcodeProduct.fromJson(Map<String, dynamic> json) {
+    return BarcodeProduct(
+      barcode: json['barcode'] as String? ?? '',
+      productName: json['product_name'] as String? ?? 'Unknown Product',
+      brand: json['brand'] as String? ?? '',
+      kcalPer100g: ((json['energy_kcal'] as num?)?.toDouble() ?? 0.0).toInt(),
+      protein: (json['protein'] as num?)?.toDouble() ?? 0.0,
+      carbs: (json['carb'] as num?)?.toDouble() ?? 0.0,
+      fat: (json['fat'] as num?)?.toDouble() ?? 0.0,
+      servingSize: json['serving_size'] as String? ?? '100g',
+    );
+  }
+}
 
 class BarcodeScannerScreen extends StatefulWidget {
   const BarcodeScannerScreen({super.key});
@@ -19,11 +55,17 @@ class BarcodeScannerScreen extends StatefulWidget {
 
 class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with SingleTickerProviderStateMixin {
   late AnimationController _scannerController;
+  late final MobileScannerController _cameraController;
   bool _isScanning = true;
 
   @override
   void initState() {
     super.initState();
+    _cameraController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.normal,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+    );
     _scannerController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -32,42 +74,53 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
 
   @override
   void dispose() {
+    _cameraController.dispose();
     _scannerController.dispose();
     super.dispose();
   }
 
-  void _onSimulateScan(String barcode) async {
+  void _onDetect(BarcodeCapture capture) {
+    if (!_isScanning) return;
+    final List<Barcode> barcodes = capture.barcodes;
+    for (final barcode in barcodes) {
+      final String? code = barcode.rawValue;
+      if (code != null && code.isNotEmpty) {
+        _onBarcodeDetected(code);
+        break;
+      }
+    }
+  }
+
+  void _onBarcodeDetected(String barcode) async {
     if (!_isScanning) return;
     setState(() {
       _isScanning = false;
     });
 
+    _cameraController.stop();
+
     await Haptics.vibrate(HapticsType.success);
 
-    // Look up barcode in mock database
-    final product = mockBarcodeProducts.firstWhere(
-      (p) => p.barcode == barcode,
-      orElse: () => const BarcodeProduct(
-        barcode: '',
-        productName: '',
-        brand: '',
-        kcalPer100g: 0,
-        protein: 0,
-        carbs: 0,
-        fat: 0,
-        servingSize: '',
-      ),
-    );
+    BarcodeProduct? product;
+
+    try {
+      final apiResult = await ApiClient.lookupBarcode(barcode);
+      if (apiResult != null) {
+        product = BarcodeProduct.fromJson(apiResult);
+      }
+    } catch (e) {
+      debugPrint('Barcode API lookup error: $e');
+    }
 
     if (!mounted) return;
 
-    if (product.barcode.isEmpty) {
-      // Show error toast
+    if (product == null) {
       final s = AppStrings.of(context);
       ErrorToast.show(context, s.productNotFound);
       setState(() {
         _isScanning = true;
       });
+      _cameraController.start();
     } else {
       _showProductBottomSheet(product);
     }
@@ -77,9 +130,14 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     final theme = Theme.of(context);
     final s = AppStrings.of(context);
     
-    // Default meal type and quantity state
     MealType selectedMealType = MealType.snack;
     double quantityGrams = 100.0;
+
+    List<dynamic> matchingIngredients = [];
+    bool isLoadingMatches = true;
+    Map<String, dynamic>? selectedIngredient;
+    String searchError = '';
+    bool hasFetched = false;
 
     showModalBottomSheet(
       context: context,
@@ -97,6 +155,49 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
             final double calculatedCarbs = (product.carbs * quantityGrams) / 100;
             final double calculatedFat = (product.fat * quantityGrams) / 100;
 
+            if (!hasFetched) {
+              hasFetched = true;
+              Future.microtask(() async {
+                try {
+                  final name = product.productName;
+                  final cleanName = name.replaceAll(RegExp(r'[^\w\s]'), '');
+                  final words = cleanName.split(RegExp(r'\s+')).where((w) => w.length > 2).toList();
+                  
+                  List<dynamic> results = [];
+                  if (words.isNotEmpty) {
+                    final query = words.take(2).join(' ');
+                    results = await ApiClient.searchIngredients(query);
+                  }
+                  
+                  if (results.isEmpty && words.isNotEmpty) {
+                    results = await ApiClient.searchIngredients(words.first);
+                  }
+                  
+                  if (results.isEmpty) {
+                    final queryLimit = product.productName.length > 20 ? 20 : product.productName.length;
+                    results = await ApiClient.searchIngredients(product.productName.substring(0, queryLimit));
+                  }
+                  
+                  if (context.mounted) {
+                    setModalState(() {
+                      matchingIngredients = results;
+                      isLoadingMatches = false;
+                      if (results.isNotEmpty) {
+                        selectedIngredient = results.first as Map<String, dynamic>;
+                      }
+                    });
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    setModalState(() {
+                      isLoadingMatches = false;
+                      searchError = e.toString();
+                    });
+                  }
+                }
+              });
+            }
+
             return Padding(
               padding: EdgeInsets.only(
                 left: AppSpacing.lg,
@@ -104,200 +205,285 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                 top: AppSpacing.md,
                 bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.outlineVariant,
-                        borderRadius: BorderRadius.circular(2),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.productName,
-                              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              '${product.brand} · Barcode: ${product.barcode}',
-                              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
-                            ),
-                          ],
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.productName,
+                                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                '${product.brand} · Barcode: ${product.barcode}',
+                                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
+                              ),
+                            ],
+                          ),
                         ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(AppRadius.chip),
+                          ),
+                          child: Text(
+                            '${calculatedKcal.toInt()} kcal',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: AppSpacing.xl),
+                    
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _MacroBlock(
+                          label: s.carbs,
+                          value: '${calculatedCarbs.toStringAsFixed(1)}g',
+                          color: theme.colorScheme.primary,
+                        ),
+                        _MacroBlock(
+                          label: s.protein,
+                          value: '${calculatedProtein.toStringAsFixed(1)}g',
+                          color: theme.colorScheme.secondary,
+                        ),
+                        _MacroBlock(
+                          label: s.fat,
+                          value: '${calculatedFat.toStringAsFixed(1)}g',
+                          color: const Color(0xFFD47A22),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+
+                    Text(
+                      s.isTamil ? 'உணவுத் தரவுத்தளத்துடன் இணைக்கவும்' : 'Map to Database Food',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      s.isTamil 
+                          ? 'கலோரிகளை கணக்கிட இதற்கேற்ற பொதுவான உணவை தேர்வு செய்யவும்' 
+                          : 'Select the generic food equivalent from the database for accurate tracking.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (isLoadingMatches)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(AppSpacing.md),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else ...[
+                      if (matchingIngredients.isNotEmpty) ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedIngredient?['code'] as String?,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: theme.colorScheme.surfaceContainer,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.button),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                          ),
+                          items: matchingIngredients.map<DropdownMenuItem<String>>((item) {
+                            final name = item['name'] as String? ?? '';
+                            final code = item['code'] as String? ?? '';
+                            return DropdownMenuItem<String>(
+                              value: code,
+                              child: Text(
+                                '$name ($code)',
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (code) {
+                            setModalState(() {
+                              selectedIngredient = matchingIngredients.firstWhere((item) => item['code'] == code);
+                            });
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                      ] else ...[
+                        Text(
+                          s.isTamil ? 'பொருந்தும் உணவு எதுவும் கிடைக்கவில்லை. கைமுறையாகத் தேடவும்.' : 'No matching database ingredients found. Please search manually.',
+                          style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                      ],
+                      if (searchError.isNotEmpty) ...[
+                        Text(
+                          searchError,
+                          style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                      ],
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: s.isTamil ? 'தரவுத்தளத்தில் தேடவும்...' : 'Search database to map manually...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHigh,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.button),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                        ),
+                        onSubmitted: (query) async {
+                          final trimmed = query.trim();
+                          if (trimmed.isEmpty) return;
+                          setModalState(() {
+                            isLoadingMatches = true;
+                          });
+                          try {
+                            final results = await ApiClient.searchIngredients(trimmed);
+                            setModalState(() {
+                              matchingIngredients = results;
+                              isLoadingMatches = false;
+                              if (results.isNotEmpty) {
+                                selectedIngredient = results.first as Map<String, dynamic>;
+                              } else {
+                                selectedIngredient = null;
+                              }
+                            });
+                          } catch (e) {
+                            setModalState(() {
+                              isLoadingMatches = false;
+                              searchError = e.toString();
+                            });
+                          }
+                        },
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(AppRadius.chip),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+
+                    Text(
+                      s.isTamil ? 'உணவு வகை' : 'Select Meal Type',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      children: MealType.values.map((type) {
+                        final isSelected = selectedMealType == type;
+                        return ChoiceChip(
+                          label: Text(_getMealTypeName(type, s)),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setModalState(() => selectedMealType = type);
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          s.isTamil ? 'அளவு (கிராம்)' : 'Quantity (grams)',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                        child: Text(
-                          '${calculatedKcal.toInt()} kcal',
+                        Text(
+                          '${quantityGrams.toInt()} g',
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.onPrimaryContainer,
+                            color: theme.colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: AppSpacing.xl),
-                  
-                  // Macro Splits Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _MacroBlock(
-                        label: s.carbs,
-                        value: '${calculatedCarbs.toStringAsFixed(1)}g',
-                        color: theme.colorScheme.primary,
-                      ),
-                      _MacroBlock(
-                        label: s.protein,
-                        value: '${calculatedProtein.toStringAsFixed(1)}g',
-                        color: theme.colorScheme.secondary,
-                      ),
-                      _MacroBlock(
-                        label: s.fat,
-                        value: '${calculatedFat.toStringAsFixed(1)}g',
-                        color: const Color(0xFFD47A22),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                      ],
+                    ),
+                    Slider(
+                      value: quantityGrams,
+                      min: 10,
+                      max: 500,
+                      divisions: 49,
+                      label: '${quantityGrams.toInt()}g',
+                      activeColor: theme.colorScheme.primary,
+                      inactiveColor: theme.colorScheme.surfaceContainerHighest,
+                      onChanged: (val) {
+                        setModalState(() => quantityGrams = val);
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
 
-                  // Meal Type Selection Chips
-                  Text(
-                    s.isTamil ? 'உணவு வகை' : 'Select Meal Type',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    children: MealType.values.map((type) {
-                      final isSelected = selectedMealType == type;
-                      return ChoiceChip(
-                        label: Text(_getMealTypeName(type, s)),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          if (selected) {
-                            setModalState(() => selectedMealType = type);
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                    Consumer(
+                      builder: (context, ref, child) {
+                        return AppLogButton(
+                          onPressed: selectedIngredient == null
+                              ? null
+                              : () async {
+                                  await Haptics.vibrate(HapticsType.medium);
+                                  final code = selectedIngredient!['code'] as String;
+                                  
+                                  try {
+                                    await ApiClient.logIngredient(
+                                      mealType: selectedMealType.name,
+                                      ingredientCode: code,
+                                      quantityG: quantityGrams,
+                                    );
 
-                  // Quantity Slider
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        s.isTamil ? 'அளவு (கிராம்)' : 'Quantity (grams)',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${quantityGrams.toInt()} g',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Slider(
-                    value: quantityGrams,
-                    min: 10,
-                    max: 500,
-                    divisions: 49,
-                    label: '${quantityGrams.toInt()}g',
-                    activeColor: theme.colorScheme.primary,
-                    inactiveColor: theme.colorScheme.surfaceContainerHighest,
-                    onChanged: (val) {
-                      setModalState(() => quantityGrams = val);
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                                    ref.invalidate(dashboardProvider);
 
-                  // Log Button
-                  Consumer(
-                    builder: (context, ref, child) {
-                      return SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            await Haptics.vibrate(HapticsType.medium);
-                            
-                            // Map product brand & name to Tamil dynamically if required
-                            String tamilName = product.productName;
-                            if (product.barcode == '8901499000040') {
-                              tamilName = 'ஆசீர்வாத் மல்டிகிரைன் ஆட்டா';
-                            } else if (product.barcode == '8901262010191') {
-                              tamilName = 'அமுல் வெண்ணெய்';
-                            } else if (product.barcode == '8901719101046') {
-                              tamilName = 'பிரிட்டானியா மேரி கோல்ட்';
-                            }
-
-                            final mealLog = MealLog(
-                              id: DateTime.now().millisecondsSinceEpoch.toString(),
-                              recipeName: product.productName,
-                              tamilName: tamilName,
-                              quantityGrams: quantityGrams.toInt(),
-                              kcal: calculatedKcal.toInt(),
-                              proteinG: calculatedProtein,
-                              carbsG: calculatedCarbs,
-                              fatG: calculatedFat,
-                              mealType: selectedMealType,
-                            );
-
-                            ref.read(dashboardProvider.notifier).addMeal(mealLog);
-                            
-                            if (context.mounted) {
-                              Navigator.pop(context); // Close bottom sheet
-                              context.go('/home'); // Go to Home
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: theme.colorScheme.onPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadius.button),
-                            ),
-                          ),
-                          child: Text(
-                            s.logProduct,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                      context.go('/home');
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Error logging product: $e')),
+                                      );
+                                    }
+                                  }
+                                },
+                          label: s.logProduct,
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             );
           },
         );
       },
     ).then((_) {
-      // Re-enable scanning when sheet is dismissed without logging
       if (mounted) {
         setState(() {
           _isScanning = true;
         });
+        _cameraController.start();
       }
     });
   }
@@ -338,7 +524,13 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
       body: Stack(
         alignment: Alignment.center,
         children: [
-          // Simulated camera viewfinder background grid
+          Positioned.fill(
+            child: MobileScanner(
+              controller: _cameraController,
+              onDetect: _onDetect,
+            ),
+          ),
+
           Positioned.fill(
             child: Opacity(
               opacity: 0.15,
@@ -348,7 +540,6 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
             ),
           ),
 
-          // Central text
           Positioned(
             top: 40,
             child: Text(
@@ -361,7 +552,6 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
             ).animate().fade(),
           ),
 
-          // Viewfinder center target
           Center(
             child: Container(
               width: 260,
@@ -372,7 +562,6 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
               ),
               child: Stack(
                 children: [
-                  // Viewfinder corners (L-brackets)
                   Positioned(
                     top: 0, left: 0,
                     child: _CornerBracket(isTop: true, isLeft: true, color: theme.colorScheme.secondary),
@@ -390,7 +579,6 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                     child: _CornerBracket(isTop: false, isLeft: false, color: theme.colorScheme.secondary),
                   ),
 
-                  // Horizontal animated laser scanning line
                   if (_isScanning)
                     AnimatedBuilder(
                       animation: _scannerController,
@@ -419,48 +607,62 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
               ),
             ),
           ),
-
-          // Simulation Control Buttons at bottom
-          Positioned(
-            bottom: 40,
-            left: 20,
-            right: 20,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  s.isTamil ? 'மாதிரி ஸ்கேன் சோதிக்க:' : 'Simulate Scanning Packaged Product:',
-                  style: theme.textTheme.labelMedium?.copyWith(color: Colors.white70),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _SimulateButton(
-                      label: s.isTamil ? 'ஆட்டா' : 'Atta',
-                      onPressed: () => _onSimulateScan('8901499000040'),
-                    ),
-                    _SimulateButton(
-                      label: s.isTamil ? 'வெண்ணெய்' : 'Butter',
-                      onPressed: () => _onSimulateScan('8901262010191'),
-                    ),
-                    _SimulateButton(
-                      label: s.isTamil ? 'பிஸ்கட்' : 'Biscuit',
-                      onPressed: () => _onSimulateScan('8901719101046'),
-                    ),
-                    _SimulateButton(
-                      label: s.isTamil ? 'தவறான பொருள்' : 'Invalid',
-                      onPressed: () => _onSimulateScan('0000000000000'),
-                      color: theme.colorScheme.error,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class AppLogButton extends StatefulWidget {
+  final VoidCallback? onPressed;
+  final String label;
+
+  const AppLogButton({
+    super.key,
+    required this.onPressed,
+    required this.label,
+  });
+
+  @override
+  State<AppLogButton> createState() => _AppLogButtonState();
+}
+
+class _AppLogButtonState extends State<AppLogButton> {
+  bool _isLogging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isEnabled = widget.onPressed != null;
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: (!isEnabled || _isLogging)
+            ? null
+            : () async {
+                setState(() {
+                  _isLogging = true;
+                });
+                widget.onPressed!();
+              },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: theme.colorScheme.onPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.button),
+          ),
+        ),
+        child: _isLogging
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+              )
+            : Text(
+                widget.label,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
       ),
     );
   }
@@ -527,7 +729,6 @@ class _CornerBracket extends StatelessWidget {
       height: length,
       child: Stack(
         children: [
-          // Horizontal leg
           Positioned(
             top: isTop ? 0 : null,
             bottom: isTop ? null : 0,
@@ -538,7 +739,6 @@ class _CornerBracket extends StatelessWidget {
               color: color,
             ),
           ),
-          // Vertical leg
           Positioned(
             top: 0,
             bottom: 0,
@@ -551,36 +751,6 @@ class _CornerBracket extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SimulateButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onPressed;
-  final Color? color;
-
-  const _SimulateButton({
-    required this.label,
-    required this.onPressed,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final buttonColor = color ?? theme.colorScheme.secondary;
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: buttonColor.withValues(alpha: 0.2),
-        foregroundColor: buttonColor,
-        side: BorderSide(color: buttonColor),
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 }

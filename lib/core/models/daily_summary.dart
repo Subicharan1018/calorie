@@ -3,10 +3,12 @@ import 'meal_log.dart';
 class DailySummary {
   final int targetKcal;
   final List<MealLog> meals;
+  final String date;
 
   const DailySummary({
     required this.targetKcal,
     required this.meals,
+    required this.date,
   });
 
   int get consumedKcal => meals.fold(0, (sum, m) => sum + m.kcal);
@@ -18,4 +20,17 @@ class DailySummary {
   double get targetProtein => (targetKcal * 0.3) / 4;
   double get targetCarbs => (targetKcal * 0.4) / 4;
   double get targetFat => (targetKcal * 0.3) / 9;
+
+  factory DailySummary.fromJson(Map<String, dynamic> json, int targetKcal) {
+    var rawLogs = json['logs'] as List<dynamic>? ?? [];
+    var mealsList = rawLogs
+        .map((e) => MealLog.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    return DailySummary(
+      targetKcal: targetKcal,
+      meals: mealsList,
+      date: json['date'] as String? ?? '',
+    );
+  }
 }

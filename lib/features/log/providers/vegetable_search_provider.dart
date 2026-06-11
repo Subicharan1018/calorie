@@ -1,21 +1,23 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:kalori/features/log/models/vegetable.dart';
-import 'package:kalori/mock/mock_data.dart';
+import 'package:kalori/features/log/models/ingredient.dart';
+import 'package:kalori/api/api_client.dart';
 
 final vegetableSearchQueryProvider = StateProvider<String>((ref) => '');
-final selectedVegetablesProvider = StateProvider<List<Vegetable>>((ref) => []);
+final selectedVegetablesProvider = StateProvider<List<Ingredient>>((ref) => []);
 
-final searchResultsProvider = Provider<List<Vegetable>>((ref) {
-  final query = ref.watch(vegetableSearchQueryProvider).toLowerCase();
+final searchResultsProvider = FutureProvider.autoDispose<List<Ingredient>>((ref) async {
+  final query = ref.watch(vegetableSearchQueryProvider);
   final selected = ref.watch(selectedVegetablesProvider);
-  final selectedIds = selected.map((v) => v.id).toSet();
-  
-  if (query.isEmpty) {
-    return mockVegetables.where((v) => !selectedIds.contains(v.id)).toList();
+  final selectedCodes = selected.map((v) => v.code).toSet();
+
+  if (query.trim().isEmpty) {
+    // Return empty list initially.
+    return <Ingredient>[];
   }
+
+  final results = await ApiClient.searchIngredients(query);
+  final ingredients = results.map((e) => Ingredient.fromJson(e as Map<String, dynamic>)).toList();
   
-  return mockVegetables.where((v) {
-    if (selectedIds.contains(v.id)) return false;
-    return v.englishName.toLowerCase().contains(query) || v.tamilName.toLowerCase().contains(query);
-  }).toList();
+  // Filter out already selected items
+  return ingredients.where((i) => !selectedCodes.contains(i.code)).toList();
 });
