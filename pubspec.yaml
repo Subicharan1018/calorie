@@ -41,6 +41,7 @@ dependencies:
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
   animations: ^2.2.0
+  image_picker: ^1.2.2
 
 dev_dependencies:
   flutter_test:

@@ -1,7 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:kalori/core/models/meal_log.dart';
 import 'package:kalori/features/home/providers/dashboard_provider.dart';
 import 'package:kalori/l10n/app_strings.dart';
@@ -57,6 +59,8 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
   late AnimationController _scannerController;
   late final MobileScannerController _cameraController;
   bool _isScanning = true;
+  bool _isUploadingLabel = false;
+  String _uploadingStatus = '';
 
   @override
   void initState() {
@@ -91,6 +95,175 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     }
   }
 
+  void _resumeScanning() {
+    if (mounted) {
+      setState(() {
+        _isScanning = true;
+      });
+      _cameraController.start();
+    }
+  }
+
+  Future<void> _pickLabelImage(ImageSource source, {required String barcode}) async {
+    final s = AppStrings.of(context);
+    final picker = ImagePicker();
+    
+    try {
+      _cameraController.stop();
+      setState(() {
+        _isScanning = false;
+      });
+
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      
+      if (image == null) {
+        _resumeScanning();
+        return;
+      }
+
+      setState(() {
+        _isUploadingLabel = true;
+        _uploadingStatus = s.analyzingLabel;
+      });
+
+      final apiResult = await ApiClient.scanLabel(image.path, barcode: barcode);
+      
+      if (apiResult != null) {
+        // Fetch the updated barcode product directly from lookup cache/DB
+        final lookupResult = await ApiClient.lookupBarcode(barcode);
+        
+        setState(() {
+          _isUploadingLabel = false;
+        });
+
+        if (lookupResult != null) {
+          final product = BarcodeProduct.fromJson(lookupResult);
+          _showProductBottomSheet(product);
+        } else {
+          _showScanError(s.labelScanFailed);
+        }
+      } else {
+        setState(() {
+          _isUploadingLabel = false;
+        });
+        _showScanError(s.labelScanFailed);
+      }
+    } catch (e) {
+      debugPrint('Scan label error: $e');
+      setState(() {
+        _isUploadingLabel = false;
+      });
+      _showScanError(s.labelScanFailed);
+    }
+  }
+
+  void _showScanError(String message) {
+    if (!mounted) return;
+    ErrorToast.show(context, message);
+    _resumeScanning();
+  }
+
+  void _showBarcodeNotFoundDialog(String barcode) {
+    final theme = Theme.of(context);
+    final s = AppStrings.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            backgroundColor: theme.colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+            ),
+            icon: Icon(
+              Icons.warning_amber_rounded,
+              color: theme.colorScheme.error,
+              size: 48,
+            ),
+            title: Text(
+              s.productNotFound,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  s.productNotFoundScanLabelPrompt,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _pickLabelImage(ImageSource.camera, barcode: barcode);
+                  },
+                  icon: const Icon(Icons.camera_alt),
+                  label: Text(s.isTamil ? 'படம் பிடி' : 'Take Photo'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.secondary,
+                    foregroundColor: theme.colorScheme.onSecondary,
+                    minimumSize: const Size(double.infinity, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _pickLabelImage(ImageSource.gallery, barcode: barcode);
+                  },
+                  icon: Icon(Icons.photo_library, color: theme.colorScheme.secondary),
+                  label: Text(
+                    s.uploadLabelPhoto,
+                    style: TextStyle(color: theme.colorScheme.secondary),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: theme.colorScheme.secondary.withValues(alpha: 0.5)),
+                    minimumSize: const Size(double.infinity, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _resumeScanning();
+                },
+                child: Text(
+                  s.tryAgain,
+                  style: TextStyle(
+                    color: theme.colorScheme.outline,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+            actionsAlignment: MainAxisAlignment.center,
+          ),
+        );
+      },
+    );
+  }
+
   void _onBarcodeDetected(String barcode) async {
     if (!_isScanning) return;
     setState(() {
@@ -115,12 +288,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     if (!mounted) return;
 
     if (product == null) {
-      final s = AppStrings.of(context);
-      ErrorToast.show(context, s.productNotFound);
-      setState(() {
-        _isScanning = true;
-      });
-      _cameraController.start();
+      _showBarcodeNotFoundDialog(barcode);
     } else {
       _showProductBottomSheet(product);
     }
@@ -130,6 +298,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     final theme = Theme.of(context);
     final s = AppStrings.of(context);
     
+    BarcodeProduct currentProduct = product;
     MealType selectedMealType = MealType.snack;
     double quantityGrams = 100.0;
 
@@ -138,6 +307,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     Map<String, dynamic>? selectedIngredient;
     String searchError = '';
     bool hasFetched = false;
+    String lastFetchedName = '';
 
     showModalBottomSheet(
       context: context,
@@ -150,16 +320,18 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final double calculatedKcal = (product.kcalPer100g * quantityGrams) / 100;
-            final double calculatedProtein = (product.protein * quantityGrams) / 100;
-            final double calculatedCarbs = (product.carbs * quantityGrams) / 100;
-            final double calculatedFat = (product.fat * quantityGrams) / 100;
+            final double calculatedKcal = (currentProduct.kcalPer100g * quantityGrams) / 100;
+            final double calculatedProtein = (currentProduct.protein * quantityGrams) / 100;
+            final double calculatedCarbs = (currentProduct.carbs * quantityGrams) / 100;
+            final double calculatedFat = (currentProduct.fat * quantityGrams) / 100;
 
-            if (!hasFetched) {
+            if (!hasFetched || lastFetchedName != currentProduct.productName) {
               hasFetched = true;
+              lastFetchedName = currentProduct.productName;
+              isLoadingMatches = true;
               Future.microtask(() async {
                 try {
-                  final name = product.productName;
+                  final name = currentProduct.productName;
                   final cleanName = name.replaceAll(RegExp(r'[^\w\s]'), '');
                   final words = cleanName.split(RegExp(r'\s+')).where((w) => w.length > 2).toList();
                   
@@ -174,8 +346,8 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                   }
                   
                   if (results.isEmpty) {
-                    final queryLimit = product.productName.length > 20 ? 20 : product.productName.length;
-                    results = await ApiClient.searchIngredients(product.productName.substring(0, queryLimit));
+                    final queryLimit = currentProduct.productName.length > 20 ? 20 : currentProduct.productName.length;
+                    results = await ApiClient.searchIngredients(currentProduct.productName.substring(0, queryLimit));
                   }
                   
                   if (context.mounted) {
@@ -184,6 +356,8 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                       isLoadingMatches = false;
                       if (results.isNotEmpty) {
                         selectedIngredient = results.first as Map<String, dynamic>;
+                      } else {
+                        selectedIngredient = null;
                       }
                     });
                   }
@@ -229,16 +403,45 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                product.productName,
+                                currentProduct.productName,
                                 style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                               ),
-                              Text(
-                                '${product.brand} · Barcode: ${product.barcode}',
-                                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${currentProduct.brand} · Barcode: ${currentProduct.barcode}',
+                                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.edit_outlined,
+                                      size: 18,
+                                      color: theme.colorScheme.secondary,
+                                    ),
+                                    onPressed: () {
+                                      _showEditProductDialog(
+                                        context,
+                                        currentProduct,
+                                        (updated) {
+                                          setModalState(() {
+                                            currentProduct = updated;
+                                          });
+                                        },
+                                      );
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
+                        const SizedBox(width: AppSpacing.sm),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
@@ -488,6 +691,241 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     });
   }
 
+  void _showEditProductDialog(
+    BuildContext context,
+    BarcodeProduct product,
+    Function(BarcodeProduct) onSaved,
+  ) {
+    final theme = Theme.of(context);
+    final s = AppStrings.of(context);
+
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController(text: product.productName);
+    final brandController = TextEditingController(text: product.brand);
+    final kcalController = TextEditingController(text: product.kcalPer100g.toString());
+    final proteinController = TextEditingController(text: product.protein.toString());
+    final carbsController = TextEditingController(text: product.carbs.toString());
+    final fatController = TextEditingController(text: product.fat.toString());
+    final servingController = TextEditingController(text: product.servingSize);
+
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: AlertDialog(
+                backgroundColor: theme.colorScheme.surfaceContainer,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                ),
+                title: Text(
+                  s.isTamil ? 'தயாரிப்பு விவரங்களை திருத்து' : 'Edit Product Details',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                content: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: nameController,
+                          decoration: InputDecoration(
+                            labelText: s.isTamil ? 'பெயர்' : 'Product Name',
+                            border: const OutlineInputBorder(),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return s.isTamil ? 'பெயர் தேவை' : 'Name is required';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: brandController,
+                          decoration: InputDecoration(
+                            labelText: s.isTamil ? 'பிராண்ட்' : 'Brand',
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: kcalController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'kcal/100g',
+                                  border: OutlineInputBorder(),
+                                ),
+                                validator: (val) {
+                                  if (val == null || double.tryParse(val) == null) {
+                                    return s.isTamil ? 'தவறான எண்' : 'Invalid';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: TextFormField(
+                                controller: servingController,
+                                decoration: InputDecoration(
+                                  labelText: s.isTamil ? 'பரிமாறும் அளவு' : 'Serving Size',
+                                  border: const OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: carbsController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(
+                                  labelText: s.isTamil ? 'கார்ப்ஸ் (g)' : 'Carbs (g)',
+                                  border: const OutlineInputBorder(),
+                                ),
+                                validator: (val) {
+                                  if (val == null || double.tryParse(val) == null) {
+                                    return s.isTamil ? 'தவறான எண்' : 'Invalid';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: TextFormField(
+                                controller: proteinController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(
+                                  labelText: s.isTamil ? 'புரதம் (g)' : 'Protein (g)',
+                                  border: const OutlineInputBorder(),
+                                ),
+                                validator: (val) {
+                                  if (val == null || double.tryParse(val) == null) {
+                                    return s.isTamil ? 'தவறான எண்' : 'Invalid';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: TextFormField(
+                                controller: fatController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(
+                                  labelText: s.isTamil ? 'கொழுப்பு (g)' : 'Fat (g)',
+                                  border: const OutlineInputBorder(),
+                                ),
+                                validator: (val) {
+                                  if (val == null || double.tryParse(val) == null) {
+                                    return s.isTamil ? 'தவறான எண்' : 'Invalid';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isSaving ? null : () => Navigator.of(context).pop(),
+                    child: Text(
+                      s.isTamil ? 'ரத்துசெய்' : 'Cancel',
+                      style: TextStyle(color: theme.colorScheme.outline),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            if (formKey.currentState?.validate() ?? false) {
+                              setState(() {
+                                isSaving = true;
+                              });
+
+                              final updatedData = {
+                                'product_name': nameController.text.trim(),
+                                'brand': brandController.text.trim(),
+                                'energy_kcal': double.parse(kcalController.text),
+                                'carb': double.parse(carbsController.text),
+                                'protein': double.parse(proteinController.text),
+                                'fat': double.parse(fatController.text),
+                                'serving_size': servingController.text.trim(),
+                              };
+
+                              try {
+                                final res = await ApiClient.updateBarcodeProduct(
+                                  product.barcode,
+                                  updatedData,
+                                );
+                                if (res != null) {
+                                  final updatedProduct = BarcodeProduct.fromJson(res);
+                                  await Haptics.vibrate(HapticsType.success);
+                                  onSaved(updatedProduct);
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                }
+                              } catch (e) {
+                                debugPrint('Save product error: $e');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error updating: $e')),
+                                  );
+                                }
+                              } finally {
+                                if (context.mounted) {
+                                  setState(() {
+                                    isSaving = false;
+                                  });
+                                }
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                      ),
+                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(s.isTamil ? 'சேமி' : 'Save'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _getMealTypeName(MealType type, AppStrings s) {
     switch (type) {
       case MealType.breakfast:
@@ -607,6 +1045,68 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
               ),
             ),
           ),
+
+          // Glassmorphic Analyzing / Loading Overlay
+          if (_isUploadingLabel)
+            Positioned.fill(
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: theme.colorScheme.secondary.withValues(alpha: 0.1),
+                              border: Border.all(
+                                color: theme.colorScheme.secondary.withValues(alpha: 0.3),
+                                width: 2,
+                              ),
+                            ),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.secondary),
+                                strokeWidth: 3,
+                              ),
+                            ),
+                          ).animate(onPlay: (controller) => controller.repeat())
+                           .scale(begin: const Offset(1, 1), end: const Offset(1.08, 1.08), duration: 1500.ms, curve: Curves.easeInOut)
+                           .then()
+                           .scale(begin: const Offset(1.08, 1.08), end: const Offset(1, 1), duration: 1500.ms, curve: Curves.easeInOut),
+                          const SizedBox(height: AppSpacing.xl),
+                          Text(
+                            _uploadingStatus,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ).animate(onPlay: (controller) => controller.repeat())
+                           .shimmer(duration: 2.seconds, color: theme.colorScheme.secondary.withValues(alpha: 0.5)),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            s.isTamil 
+                                ? 'AI கொண்டு ஊட்டச்சத்தை கணக்கிடுகிறது (சில வினாடிகள் ஆகலாம்)' 
+                                : 'Analyzing label with AI (may take a few seconds)',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white60,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

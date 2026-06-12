@@ -7,8 +7,8 @@ class ApiClient {
 
   static final Dio _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 60),
   ))..interceptors.add(PrettyDioLogger(
     requestHeader: kDebugMode,
     requestBody: kDebugMode,
@@ -189,6 +189,47 @@ class ApiClient {
       rethrow;
     }
   }
+
+  static Future<Map<String, dynamic>?> scanLabel(
+    String filePath, {
+    required String barcode,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          filePath,
+          filename: filePath.split('/').last,
+        ),
+      });
+
+      final response = await _dio.post(
+        '/barcode/scan-label',
+        queryParameters: {'barcode': barcode},
+        data: formData,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> updateBarcodeProduct(
+    String barcode,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final response = await _dio.put(
+        '/barcode/$barcode',
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
 
   // ── Recommendations ────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> getRecommendations({

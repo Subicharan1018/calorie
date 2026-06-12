@@ -558,6 +558,92 @@ curl "http://100.99.105.51:8100/barcode/8901063152732"
 
 ---
 
+## 7b. Scan Nutrition Label (Local Vision OCR)
+
+Upload a **photo of the back of a product** (nutrition table + barcode visible).
+The server extracts the barcode with **pyzbar** and reads nutrition values using the
+**local Ollama moondream vision model**. Fully offline — no external APIs.
+
+> **Prerequisite:** Ollama must be running on the host with the `moondream` model pulled.
+> The user-level systemd service `ollama-user.service` handles this automatically.
+
+```
+POST /barcode/scan-label
+Content-Type: multipart/form-data
+```
+
+| Field        | Type   | Required | Description |
+|--------------|--------|----------|-------------|
+| `file`       | image  | ✅        | JPEG or PNG photo of the nutrition label |
+| `barcode`    | string | ❌        | Override barcode; auto-detected from image if omitted |
+
+**Response 201**
+```json
+{
+  "barcode": "8901063152732",
+  "product_name": "Parle-G Biscuits",
+  "brand": "Parle",
+  "serving_size": "25g",
+  "energy_kcal": 462.0,
+  "protein": 6.7,
+  "carb": 73.0,
+  "fat": 15.7,
+  "fat_sat": 7.5,
+  "fibre": 1.2,
+  "sugars": 18.0,
+  "sodium": 0.00038,
+  "calcium": 0.00012,
+  "iron": 0.000005,
+  "source": "label_ocr",
+  "barcode_detected": "8901063152732",
+  "ocr_model": "moondream"
+}
+```
+
+| `source` value | Meaning |
+|----------------|---------|
+| `"label_ocr"`  | Nutrition extracted by moondream from the uploaded image |
+| `"cache"`      | Product already existed in local DB — returned without re-scanning |
+
+**Response 422** — No barcode detected and none provided
+**Response 503** — Ollama is not reachable or inference failed
+
+```bash
+# Auto-detect barcode from image
+curl -X POST "http://100.99.105.51:8100/barcode/scan-label" \
+  -F "file=@label.jpg"
+
+# Provide barcode manually
+curl -X POST "http://100.99.105.51:8100/barcode/scan-label?barcode=8901063152732" \
+  -F "file=@label.jpg"
+```
+
+**Flutter `ApiClient` snippet:**
+```dart
+// ── Scan nutrition label ─────────────────────────────────────────
+static Future<Map<String, dynamic>?> scanLabel(
+  File imageFile, {
+  String? barcode,
+}) async {
+  final uri = Uri.parse('$baseUrl/barcode/scan-label')
+      .replace(queryParameters: barcode != null ? {'barcode': barcode} : null);
+
+  final request = http.MultipartRequest('POST', uri);
+  request.files.add(await http.MultipartFile.fromPath(
+    'file',
+    imageFile.path,
+    contentType: MediaType('image', 'jpeg'),
+  ));
+
+  final streamedResponse = await request.send();
+  final res = await http.Response.fromStream(streamedResponse);
+  if (res.statusCode == 201) return json.decode(res.body);
+  return null;
+}
+```
+
+---
+
 ## 8. Recommendations
 
 Zero-ML, zero-external-API daily meal recommendation engine.

@@ -139,4 +139,17 @@ class AppStrings {
   String get apiError => isTamil ? 'பயன்பாட்டு பிழை நிகழ்ந்துள்ளது' : 'API error occurred';
   String get validationError => isTamil ? 'மதிப்பு தவறானது' : 'Validation error';
   String get emptySearchResult => isTamil ? 'முடிவுகள் எதுவும் இல்லை. பொதுவான பெயரை தேடவும்' : 'No results found. Try searching by common name.';
+
+  // Nutrition Label Scanner Strings
+  String get scanNutritionLabel => isTamil ? 'ஊட்டச்சத்து லேபிளை ஸ்கேன் செய்' : 'Scan Nutrition Label';
+  String get uploadLabelPhoto => isTamil ? 'லேபிள் படத்தை பதிவேற்று' : 'Upload Label Photo';
+  String get analyzingLabel => isTamil ? 'ஊட்டச்சத்து லேபிளை பகுப்பாய்வு செய்கிறது...' : 'Analyzing nutrition label...';
+  String get productNotFoundScanLabelPrompt => isTamil
+      ? 'தயாரிப்பு கண்டறியப்படவில்லை. ஊட்டச்சத்து லேபிளை ஸ்கேன் செய்ய விரும்புகிறீர்களா?'
+      : 'Product not found. Would you like to scan its nutrition label?';
+  String get scanLabelOption => isTamil ? 'லேபிளை ஸ்கேன் செய்' : 'Scan Label';
+  String get labelScanFailed => isTamil
+      ? 'ஊட்டச்சத்து லேபிளைப் பகுப்பாய்வு செய்ய முடியவில்லை. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.'
+      : 'Could not analyze nutrition label. Please try again.';
 }
+
