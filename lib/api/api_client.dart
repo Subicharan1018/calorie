@@ -55,6 +55,7 @@ class ApiClient {
 
   // ── Recipes ────────────────────────────────────────────────────────────────
   static Future<List<dynamic>> getRecipes({
+    String? q,
     String? ingredients,
     String? mealType,
     int limit = 10,
@@ -64,6 +65,9 @@ class ApiClient {
       'limit': limit,
       'offset': offset,
     };
+    if (q != null && q.trim().isNotEmpty) {
+      params['q'] = q.trim();
+    }
     if (ingredients != null && ingredients.isNotEmpty) {
       params['ingredients'] = ingredients;
     }

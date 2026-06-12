@@ -23,6 +23,13 @@ class VegetableInputScreen extends ConsumerWidget {
     return AppScaffold(
       title: s.whatVegetablesDoYouHave,
       subtitle: s.wellFindRecipes,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.menu_book_outlined),
+          tooltip: s.searchRecipesTitle,
+          onPressed: () => context.push('/log/search'),
+        ),
+      ],
       body: Column(
         children: [
           // Sticky top Search Bar Row with Scan Barcode button

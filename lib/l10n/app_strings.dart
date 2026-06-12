@@ -51,7 +51,15 @@ class AppStrings {
   String get searchAndAddAbove => isTamil ? 'காய்கறிகளைத் தேடி மேலே சேர்க்கவும்' : 'Search and add vegetables above';
   String get vegetablesSelected => isTamil ? 'காய்கறிகள் தேர்ந்தெடுக்கப்பட்டுள்ளன' : 'vegetables selected';
   String get findRecipes => isTamil ? 'உணவு வகைகளைக் கண்டுபிடி →' : 'Find Recipes →';
-  
+
+  // Recipe name search
+  String get searchRecipesTitle => isTamil ? 'சமையல் குறிப்புகளைத் தேடு' : 'Search Recipes';
+  String get searchRecipesHint => isTamil ? 'சமையல் குறிப்பு பெயர், எ.கா. சுண்டல்...' : 'Recipe name, e.g. sundal, chana...';
+  String get searchRecipesStartHeadline => isTamil ? 'பெயரால் தேடுங்கள்' : 'Search by name';
+  String get searchRecipesStartSub => isTamil ? 'சமையல் குறிப்பு அல்லது பொருளின் பெயரை உள்ளிடவும் (எ.கா. சுண்டல், சனா).' : 'Type a recipe or ingredient name (e.g. sundal, chana).';
+  String get searchRecipesEmptyHeadline => isTamil ? 'பொருத்தம் எதுவும் இல்லை' : 'No matches';
+  String get searchRecipesEmptySub => isTamil ? 'வேறு பெயரை முயற்சிக்கவும் அல்லது குறைவான சொற்களைப் பயன்படுத்தவும்.' : 'Try a different name or fewer words.';
+
   // Categories
   String get leafyGreen => isTamil ? 'கீரை வகை (Leafy Green)' : 'Leafy Green';
   String get root => isTamil ? 'கிழங்கு வகை (Root)' : 'Root';

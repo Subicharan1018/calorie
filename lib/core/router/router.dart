@@ -10,6 +10,7 @@ import '../../features/onboarding/screens/profile_setup_screen.dart';
 import '../../features/home/screens/dashboard_screen.dart';
 import '../../features/log/screens/vegetable_input_screen.dart';
 import '../../features/log/screens/recipe_suggestions_screen.dart';
+import '../../features/log/screens/recipe_search_screen.dart';
 import '../../features/trends/screens/trends_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/barcode/barcode_scanner_screen.dart';
@@ -101,6 +102,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 pageBuilder: (context, state) => _buildPageWithTransition(
                   state: state,
                   child: const RecipeSuggestionsScreen(),
+                  transitionType: SharedAxisTransitionType.horizontal,
+                ),
+              ),
+              GoRoute(
+                path: 'search',
+                pageBuilder: (context, state) => _buildPageWithTransition(
+                  state: state,
+                  child: const RecipeSearchScreen(),
                   transitionType: SharedAxisTransitionType.horizontal,
                 ),
               ),
