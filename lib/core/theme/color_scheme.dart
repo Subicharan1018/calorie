@@ -4,6 +4,7 @@ class AppColorScheme {
   // Light Mode Colors (OKLCH-Derived Cardamom & Saffron)
   static const Color primary = Color(0xFF24441C);           // Cardamom Deep - oklch(0.35 0.075 140)
   static const Color accent = Color(0xFFE49E22);            // Saffron/Turmeric Gold - oklch(0.75 0.15 75)
+  static const Color tertiary = Color(0xFFD47A22);          // Saffron Orange - oklch(0.60 0.16 45)
   static const Color bg = Color(0xFFFFFFFF);                // Pure White Surface - oklch(1 0 0)
   static const Color surface = Color(0xFFF2F6F1);           // Soft Sage wash - oklch(0.97 0.008 140)
   static const Color ink = Color(0xFF070D06);               // Deep Forest Ink - oklch(0.15 0.02 140)
@@ -12,6 +13,7 @@ class AppColorScheme {
   // Dark Mode Colors (OKLCH-Derived)
   static const Color primaryDark = Color(0xFF93BB8B);       // Cardamom Light - oklch(0.75 0.08 140)
   static const Color accentDark = Color(0xFFEBB25F);        // Saffron Gold - oklch(0.8 0.12 75)
+  static const Color tertiaryDark = Color(0xFFEAA262);      // Saffron Orange Light - oklch(0.75 0.12 45)
   static const Color bgDark = Color(0xFF0E120D);            // Deep Charcoal-Sage - oklch(0.07 0.005 140)
   static const Color surfaceDark = Color(0xFF181C17);       // Medium Charcoal-Sage - oklch(0.12 0.007 140)
   static const Color inkDark = Color(0xFFE6E9E5);           // Bone - oklch(0.93 0.005 140)
@@ -31,6 +33,8 @@ class AppColorScheme {
     onPrimary: Colors.white,
     secondary: accent,
     onSecondary: Colors.white,
+    tertiary: tertiary,
+    onTertiary: Colors.white,
     surface: bg,
     onSurface: ink,
     surfaceContainer: surface,
@@ -44,6 +48,8 @@ class AppColorScheme {
     onPrimary: Color(0xFF070D06), // Deep Forest Ink for contrast on light green
     secondary: accentDark,
     onSecondary: Color(0xFF070D06), // Deep Forest Ink for contrast on gold
+    tertiary: tertiaryDark,
+    onTertiary: Color(0xFF070D06), // Deep Forest Ink for contrast on orange
     surface: bgDark,
     onSurface: inkDark,
     surfaceContainer: surfaceDark,

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kalori/core/theme/spacing.dart';
@@ -13,6 +14,8 @@ import 'package:kalori/widgets/skeletons/recipe_card_skeleton.dart';
 import 'package:kalori/widgets/illustrations/empty_kolam_illustration.dart';
 import 'package:kalori/l10n/app_strings.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:kalori/api/api_client.dart';
+import 'package:kalori/features/log/models/recipe.dart';
 
 class RecipeSuggestionsScreen extends ConsumerStatefulWidget {
   const RecipeSuggestionsScreen({super.key});
@@ -23,6 +26,7 @@ class RecipeSuggestionsScreen extends ConsumerStatefulWidget {
 
 class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScreen> {
   String _sortBy = 'best'; // 'best', 'kcal', 'protein'
+  bool _isGenerating = false;
 
   @override
   Widget build(BuildContext context) {
@@ -32,9 +36,23 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
     final selectedCount = ref.watch(selectedVegetablesProvider).length;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
 
+    if (_isGenerating) {
+      return AppScaffold(
+        title: s.isTamil ? 'AI சமையல் குறிப்பு...' : 'Generating AI Recipe...',
+        body: const _LoadingView(),
+      );
+    }
+
     return AppScaffold(
       title: s.isTamil ? 'காய்கறிகளுக்கான சமையல் குறிப்புகள்' : 'Recipes for your vegetables',
       subtitle: s.isTamil ? '$selectedCount காய்கறிகள் தேர்வுசெய்யப்பட்டன' : '$selectedCount vegetables matched',
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showGenerateRecipeDialog,
+        icon: const Icon(Icons.auto_awesome),
+        label: Text(s.isTamil ? 'AI சமையல் குறிப்பு' : 'AI Generate'),
+        backgroundColor: theme.colorScheme.secondary,
+        foregroundColor: theme.colorScheme.onSecondary,
+      ),
       body: suggestionsAsync.when(
         loading: () => const _LoadingView(),
         error: (err, _) => FriendlyErrorView(
@@ -47,6 +65,8 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
               headline: s.emptyRecipesHeadline,
               subtext: s.emptyRecipesSub,
               illustration: const EmptyKolamIllustration(size: 140),
+              ctaText: s.isTamil ? 'AI சமையல் குறிப்பை உருவாக்கு' : 'Generate AI Recipe',
+              onCtaPressed: _showGenerateRecipeDialog,
             );
           }
 
@@ -238,6 +258,150 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
         },
       ),
     );
+  }
+
+  void _showGenerateRecipeDialog() {
+    final theme = Theme.of(context);
+    final s = AppStrings.of(context);
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final selectedVegetables = ref.read(selectedVegetablesProvider);
+    String defaultPrompt = '';
+    if (selectedVegetables.isNotEmpty) {
+      final names = selectedVegetables.map((v) => v.englishName).join(', ');
+      defaultPrompt = 'Healthy recipe with $names';
+      controller.text = defaultPrompt;
+    }
+
+    showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            backgroundColor: theme.colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.auto_awesome, color: theme.colorScheme.secondary),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  s.isTamil ? 'AI குறிப்பு உருவாக்கம்' : 'Generate AI Recipe',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  s.isTamil
+                      ? 'AI மூலம் புதிய உணவு குறிப்பை உருவாக்க ஒரு விளக்கத்தை உள்ளிடவும்:'
+                      : 'Enter a prompt to generate a custom South Indian recipe using AI:',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Form(
+                  key: formKey,
+                  child: TextFormField(
+                    controller: controller,
+                    autofocus: true,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText: s.isTamil ? 'எ.கா., காரசாரமான முருங்கைக்காய் வறுவல்...' : 'e.g., spicy dry drumstick fry for lunch...',
+                      border: const OutlineInputBorder(),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return s.isTamil ? 'விளக்கம் தேவை' : 'Prompt is required';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text(
+                  s.isTamil ? 'ரத்துசெய்' : 'Cancel',
+                  style: TextStyle(color: theme.colorScheme.outline),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState?.validate() ?? false) {
+                    final prompt = controller.text.trim();
+                    Navigator.of(context).pop(prompt);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: Text(s.isTamil ? 'உருவாக்கு' : 'Generate'),
+              ),
+            ],
+          ),
+        );
+      },
+    ).then((prompt) {
+      if (prompt != null && prompt.isNotEmpty) {
+        _generateRecipe(prompt);
+      }
+    });
+  }
+
+  void _generateRecipe(String prompt) async {
+    final theme = Theme.of(context);
+    final s = AppStrings.of(context);
+
+    setState(() {
+      _isGenerating = true;
+    });
+
+    try {
+      final newRecipeJson = await ApiClient.generateRecipe(prompt);
+      final newRecipe = Recipe.fromJson(newRecipeJson);
+
+      ref.invalidate(recipeSuggestionsProvider);
+
+      if (mounted) {
+        setState(() {
+          _isGenerating = false;
+        });
+        
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (_) => RecipeDetailSheet(recipe: newRecipe),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isGenerating = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(s.isTamil ? 'AI குறிப்பு உருவாக்க முடியவில்லை: $e' : 'Failed to generate recipe: $e'),
+            backgroundColor: theme.colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 }
 

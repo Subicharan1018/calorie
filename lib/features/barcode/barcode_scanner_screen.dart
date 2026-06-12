@@ -204,7 +204,44 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  margin: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.lightbulb_outline, size: 16, color: theme.colorScheme.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            s.isTamil ? 'OCR குறிப்புகள்:' : 'Tips for Best OCR results:',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        s.isTamil
+                            ? '• ஊட்டச்சத்து அட்டவணையை (Nutrition Facts) மட்டும் தெளிவாகப் படம் பிடிக்கவும்.\n• போதுமான வெளிச்சம் இருப்பதை உறுதிப்படுத்தவும்.\n• மடிப்புகள் அல்லது வளைவுகள் இல்லாமல் நேராக வைக்கவும்.'
+                            : '• Frame only the "Nutrition Facts" table clearly.\n• Ensure the label is well-lit and not blurry.\n• Avoid glare, shadows, or curved packaging text.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
                 ElevatedButton.icon(
                   onPressed: () {
                     Navigator.of(context).pop();
@@ -264,6 +301,97 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     );
   }
 
+  void _showManualBarcodeEntryDialog() {
+    final theme = Theme.of(context);
+    final s = AppStrings.of(context);
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    _cameraController.stop();
+    setState(() {
+      _isScanning = false;
+    });
+
+    showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            backgroundColor: theme.colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+            ),
+            title: Text(
+              s.isTamil ? 'பார்கோடு கைமுறையாக உள்ளிடுக' : 'Enter Barcode Manually',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            content: Form(
+              key: formKey,
+              child: TextFormField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: s.isTamil ? 'பார்கோடு எண்' : 'Barcode Number',
+                  border: const OutlineInputBorder(),
+                  hintText: 'e.g., 8901030732103',
+                  prefixIcon: const Icon(Icons.qr_code),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return s.isTamil ? 'பார்கோடு தேவை' : 'Barcode is required';
+                  }
+                  if (val.trim().length < 5) {
+                    return s.isTamil ? 'தவறான பார்கோடு' : 'Invalid barcode (too short)';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text(
+                  s.isTamil ? 'ரத்துசெய்' : 'Cancel',
+                  style: TextStyle(color: theme.colorScheme.outline),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState?.validate() ?? false) {
+                    final code = controller.text.trim();
+                    Navigator.of(context).pop(code);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: Text(s.isTamil ? 'தேடு' : 'Search'),
+              ),
+            ],
+          ),
+        );
+      },
+    ).then((code) {
+      if (code != null && code.isNotEmpty) {
+        setState(() {
+          _isScanning = true;
+        });
+        _onBarcodeDetected(code);
+      } else {
+        _resumeScanning();
+      }
+    });
+  }
+
   void _onBarcodeDetected(String barcode) async {
     if (!_isScanning) return;
     setState(() {
@@ -308,6 +436,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
     String searchError = '';
     bool hasFetched = false;
     String lastFetchedName = '';
+    bool showManualSearch = false;
 
     showModalBottomSheet(
       context: context,
@@ -358,6 +487,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                         selectedIngredient = results.first as Map<String, dynamic>;
                       } else {
                         selectedIngredient = null;
+                        showManualSearch = true;
                       }
                     });
                   }
@@ -476,7 +606,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                         _MacroBlock(
                           label: s.fat,
                           value: '${calculatedFat.toStringAsFixed(1)}g',
-                          color: const Color(0xFFD47A22),
+                          color: theme.colorScheme.tertiary,
                         ),
                       ],
                     ),
@@ -548,43 +678,76 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                         ),
                         const SizedBox(height: AppSpacing.xs),
                       ],
-                      TextField(
-                        decoration: InputDecoration(
-                          hintText: s.isTamil ? 'தரவுத்தளத்தில் தேடவும்...' : 'Search database to map manually...',
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHigh,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.button),
-                            borderSide: BorderSide.none,
+                      if (!showManualSearch && matchingIngredients.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xs),
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setModalState(() {
+                                showManualSearch = true;
+                              });
+                            },
+                            icon: const Icon(Icons.search, size: 18),
+                            label: Text(s.isTamil ? 'கைமுறையாகத் தேடவும்...' : 'Search manually...'),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              foregroundColor: theme.colorScheme.secondary,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-                        ),
-                        onSubmitted: (query) async {
-                          final trimmed = query.trim();
-                          if (trimmed.isEmpty) return;
-                          setModalState(() {
-                            isLoadingMatches = true;
-                          });
-                          try {
-                            final results = await ApiClient.searchIngredients(trimmed);
-                            setModalState(() {
-                              matchingIngredients = results;
-                              isLoadingMatches = false;
-                              if (results.isNotEmpty) {
-                                selectedIngredient = results.first as Map<String, dynamic>;
-                              } else {
-                                selectedIngredient = null;
+                        )
+                      else if (showManualSearch)
+                        Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xs),
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: s.isTamil ? 'தரவுத்தளத்தில் தேடவும்...' : 'Search database to map manually...',
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              suffixIcon: matchingIngredients.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: () {
+                                        setModalState(() {
+                                          showManualSearch = false;
+                                        });
+                                      },
+                                    )
+                                  : null,
+                              filled: true,
+                              fillColor: theme.colorScheme.surfaceContainerHigh,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadius.button),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                            ),
+                            onSubmitted: (query) async {
+                              final trimmed = query.trim();
+                              if (trimmed.isEmpty) return;
+                              setModalState(() {
+                                isLoadingMatches = true;
+                              });
+                              try {
+                                final results = await ApiClient.searchIngredients(trimmed);
+                                setModalState(() {
+                                  matchingIngredients = results;
+                                  isLoadingMatches = false;
+                                  if (results.isNotEmpty) {
+                                    selectedIngredient = results.first as Map<String, dynamic>;
+                                  } else {
+                                    selectedIngredient = null;
+                                  }
+                                });
+                              } catch (e) {
+                                setModalState(() {
+                                  isLoadingMatches = false;
+                                  searchError = e.toString();
+                                });
                               }
-                            });
-                          } catch (e) {
-                            setModalState(() {
-                              isLoadingMatches = false;
-                              searchError = e.toString();
-                            });
-                          }
-                        },
-                      ),
+                            },
+                          ),
+                        ),
                     ],
                     const SizedBox(height: AppSpacing.lg),
 
@@ -670,7 +833,9 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
                                     }
                                   }
                                 },
-                          label: s.logProduct,
+                          label: selectedIngredient == null
+                              ? (s.isTamil ? 'முதலில் உணவை இணைக்கவும்' : 'Map to Database Food first')
+                              : s.logProduct,
                         );
                       },
                     ),
@@ -1045,6 +1210,32 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> with Single
               ),
             ),
           ),
+
+          // Manual barcode entry button
+          if (_isScanning)
+            Positioned(
+              bottom: 40,
+              left: AppSpacing.lg,
+              right: AppSpacing.lg,
+              child: SafeArea(
+                child: TextButton.icon(
+                  onPressed: _showManualBarcodeEntryDialog,
+                  icon: const Icon(Icons.keyboard, color: Colors.white),
+                  label: Text(
+                    s.isTamil ? 'பார்கோடு கைமுறையாக உள்ளிடவும்' : 'Enter Barcode Manually',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.black54,
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.lg),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                      side: const BorderSide(color: Colors.white30),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // Glassmorphic Analyzing / Loading Overlay
           if (_isUploadingLabel)

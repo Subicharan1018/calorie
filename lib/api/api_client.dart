@@ -82,6 +82,18 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  static Future<Map<String, dynamic>> generateRecipe(String prompt) async {
+    final response = await _dio.post(
+      '/recipes/generate',
+      queryParameters: {'prompt': prompt},
+      options: Options(
+        receiveTimeout: const Duration(seconds: 90),
+        sendTimeout: const Duration(seconds: 90),
+      ),
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   // ── Meal Log ───────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> logIngredient({
     required String mealType,
@@ -206,6 +218,10 @@ class ApiClient {
         '/barcode/scan-label',
         queryParameters: {'barcode': barcode},
         data: formData,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 90),
+          sendTimeout: const Duration(seconds: 90),
+        ),
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {

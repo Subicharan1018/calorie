@@ -11,7 +11,7 @@
 
 1. [Health Check](#1-health-check)
 2. [Ingredients](#2-ingredients)
-3. [Recipes](#3-recipes)
+3. [Recipes](#3-recipes) — List · Get · **Generate (AI)**
 4. [Meals (Food Log)](#4-meals-food-log)
 5. [Weight](#5-weight)
 6. [Profile](#6-profile)
@@ -222,6 +222,68 @@ GET /recipes/{recipe_id}
 
 **Response 200** — same shape as items in the list above
 **Response 404:** `{ "detail": "Recipe 42 not found" }`
+
+---
+
+### 3.3 Generate AI Recipe
+
+Generate a new recipe using **nex-agi/nex-n2-pro:free** via OpenRouter. The model writes the
+recipe structure; ingredients are fuzzy-matched against the IFCT database and per-serving
+nutrition is computed from the matched rows. The saved recipe has `is_ai: true`.
+
+> **Timeout:** Allow at least 90 seconds — the AI call can take 30–60 s on the free tier.
+
+```
+POST /recipes/generate
+```
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `prompt`  | string | ✅       | Free-text description, e.g. `"high-protein dal for lunch"` |
+
+**Response 201** — `RecipeOut` with `is_ai: true`
+```json
+{
+  "id": 102,
+  "name": "High-Protein Masoor Dal",
+  "description": "A hearty red lentil dal tempered with cumin and garlic. Simmer lentils until soft, prepare a tadka and combine.",
+  "cuisine": "Indian",
+  "meal_type": "lunch",
+  "prep_mins": 10,
+  "cook_mins": 25,
+  "servings": 2,
+  "energy_kcal": 312.4,
+  "protein": 18.6,
+  "carb": 48.2,
+  "fat": 5.1,
+  "fibre": 9.3,
+  "is_ai": true,
+  "ingredients": [
+    { "ingredient_code": "B012", "ingredient_name": "Lentil, red, whole", "quantity_g": 100.0, "notes": "rinsed" },
+    { "ingredient_code": "D049", "ingredient_name": "Onion, dry", "quantity_g": 80.0, "notes": "finely chopped" }
+  ]
+}
+```
+
+> **Note:** Only ingredients that match an IFCT code are included. If the AI suggests an ingredient
+> the DB doesn't recognise it is silently skipped; nutrition is computed only from matched rows.
+
+**Response 503** — AI call failed (retry)
+
+```bash
+curl -X POST "http://100.99.105.51:8100/recipes/generate?prompt=high-protein+dal+for+lunch"
+```
+
+**Flutter:**
+```dart
+static Future<Map<String, dynamic>> generateRecipe(String prompt) async {
+  final uri = Uri.parse('$baseUrl/recipes/generate')
+      .replace(queryParameters: {'prompt': prompt});
+  final res = await http.post(uri);
+  if (res.statusCode == 201) return jsonDecode(res.body);
+  throw Exception('Recipe generation failed: ${res.statusCode}');
+}
+```
 
 ---
 
@@ -558,24 +620,28 @@ curl "http://100.99.105.51:8100/barcode/8901063152732"
 
 ---
 
-## 7b. Scan Nutrition Label (Local Vision OCR)
+## 7b. Scan Nutrition Label (Vision OCR)
 
-Upload a **photo of the back of a product** (nutrition table + barcode visible).
-The server extracts the barcode with **pyzbar** and reads nutrition values using the
-**local Ollama moondream vision model**. Fully offline — no external APIs.
+Upload a **photo of the nutrition label** for a product that is not in the database.
+The server sends the image to **nex-agi/nex-n2-pro:free** via OpenRouter, which extracts
+and returns structured nutrition JSON. The result is saved to PostgreSQL and subsequent
+`GET /barcode/{barcode}` calls return it instantly from cache.
 
-> **Prerequisite:** Ollama must be running on the host with the `moondream` model pulled.
-> The user-level systemd service `ollama-user.service` handles this automatically.
+> **Timeout:** Set your client timeout to at least **90 seconds** — vision inference can
+> take 30–60 s on the free tier.
+
+> **Flow:** Scan barcode → `GET /barcode/{barcode}` → if **404** → photograph label →
+> `POST /barcode/scan-label?barcode={code}` → product is now in DB.
 
 ```
 POST /barcode/scan-label
 Content-Type: multipart/form-data
 ```
 
-| Field        | Type   | Required | Description |
-|--------------|--------|----------|-------------|
-| `file`       | image  | ✅        | JPEG or PNG photo of the nutrition label |
-| `barcode`    | string | ❌        | Override barcode; auto-detected from image if omitted |
+| Field     | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `file`    | image  | ✅       | JPEG or PNG photo of the nutrition label |
+| `barcode` | string | ✅       | Barcode string (already known from step 1) |
 
 **Response 201**
 ```json
@@ -595,25 +661,19 @@ Content-Type: multipart/form-data
   "calcium": 0.00012,
   "iron": 0.000005,
   "source": "label_ocr",
-  "barcode_detected": "8901063152732",
-  "ocr_model": "moondream"
+  "ocr_model": "nex-agi/nex-n2-pro:free"
 }
 ```
 
 | `source` value | Meaning |
 |----------------|---------|
-| `"label_ocr"`  | Nutrition extracted by moondream from the uploaded image |
-| `"cache"`      | Product already existed in local DB — returned without re-scanning |
+| `"label_ocr"`  | Nutrition extracted from the image by the vision model |
+| `"cache"`      | Product already in DB — returned without re-scanning |
 
-**Response 422** — No barcode detected and none provided
-**Response 503** — Ollama is not reachable or inference failed
+**Response 400** — File too small or wrong content type
+**Response 503** — OpenRouter vision call failed
 
 ```bash
-# Auto-detect barcode from image
-curl -X POST "http://100.99.105.51:8100/barcode/scan-label" \
-  -F "file=@label.jpg"
-
-# Provide barcode manually
 curl -X POST "http://100.99.105.51:8100/barcode/scan-label?barcode=8901063152732" \
   -F "file=@label.jpg"
 ```
@@ -622,11 +682,11 @@ curl -X POST "http://100.99.105.51:8100/barcode/scan-label?barcode=8901063152732
 ```dart
 // ── Scan nutrition label ─────────────────────────────────────────
 static Future<Map<String, dynamic>?> scanLabel(
-  File imageFile, {
-  String? barcode,
-}) async {
+  File imageFile,
+  String barcode,
+) async {
   final uri = Uri.parse('$baseUrl/barcode/scan-label')
-      .replace(queryParameters: barcode != null ? {'barcode': barcode} : null);
+      .replace(queryParameters: {'barcode': barcode});
 
   final request = http.MultipartRequest('POST', uri);
   request.files.add(await http.MultipartFile.fromPath(
@@ -635,9 +695,10 @@ static Future<Map<String, dynamic>?> scanLabel(
     contentType: MediaType('image', 'jpeg'),
   ));
 
-  final streamedResponse = await request.send();
+  final streamedResponse = await request.send()
+      .timeout(const Duration(seconds: 90));
   final res = await http.Response.fromStream(streamedResponse);
-  if (res.statusCode == 201) return json.decode(res.body);
+  if (res.statusCode == 201) return jsonDecode(res.body);
   return null;
 }
 ```
@@ -1005,6 +1066,15 @@ class ApiClient {
   static Future<Map<String, dynamic>> getRecipe(int id) =>
       _get(Uri.parse('$baseUrl/recipes/$id'));
 
+  static Future<Map<String, dynamic>> generateRecipe(String prompt) async {
+    final uri = Uri.parse('$baseUrl/recipes/generate')
+        .replace(queryParameters: {'prompt': prompt});
+    final res = await http.post(uri)
+        .timeout(const Duration(seconds: 90));
+    if (res.statusCode == 201) return jsonDecode(res.body);
+    throw Exception('Recipe generation failed: ${res.statusCode}');
+  }
+
   // ── Meal Log ──────────────────────────────────────────────────
   static Future<Map<String, dynamic>> logIngredient({
     required String mealType,
@@ -1204,4 +1274,4 @@ class ApiClient {
 
 ---
 
-*Updated 2026-06-11 — Phase 4 Recommendations engine added. Generated from live API at http://100.99.105.51:8100/openapi.json*
+*Updated 2026-06-12 — Vision OCR migrated to nex-agi/nex-n2-pro:free (OpenRouter); AI recipe generation added (POST /recipes/generate).*
