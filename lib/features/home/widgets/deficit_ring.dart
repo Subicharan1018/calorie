@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:kalori/core/models/daily_summary.dart';
+import 'package:kalori/core/theme/color_scheme.dart';
 import 'package:kalori/l10n/app_strings.dart';
 
 class DeficitRingWidget extends StatefulWidget {
@@ -41,8 +42,23 @@ class _DeficitRingWidgetState extends State<DeficitRingWidget> with SingleTicker
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final s = AppStrings.of(context);
-    
-    return AspectRatio(
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+
+    final summary = widget.summary;
+    final remaining = summary.targetKcal - summary.consumedKcal;
+    final semanticsLabel = remaining >= 0
+        ? (s.isTamil
+            ? '$remaining கலோரி மீதம், இலக்கு ${summary.targetKcal}. கார்ப்ஸ் ${summary.consumedCarbs.toInt()}கி, புரதம் ${summary.consumedProtein.toInt()}கி, கொழுப்பு ${summary.consumedFat.toInt()}கி.'
+            : '$remaining kcal remaining of ${summary.targetKcal} target. Carbs ${summary.consumedCarbs.toInt()}g, protein ${summary.consumedProtein.toInt()}g, fat ${summary.consumedFat.toInt()}g.')
+        : (s.isTamil
+            ? '${-remaining} கலோரி இலக்கை மீறியது. கார்ப்ஸ் ${summary.consumedCarbs.toInt()}கி, புரதம் ${summary.consumedProtein.toInt()}கி, கொழுப்பு ${summary.consumedFat.toInt()}கி.'
+            : '${-remaining} kcal over target. Carbs ${summary.consumedCarbs.toInt()}g, protein ${summary.consumedProtein.toInt()}g, fat ${summary.consumedFat.toInt()}g.');
+
+    return Semantics(
+      container: true,
+      label: semanticsLabel,
+      child: ExcludeSemantics(
+        child: AspectRatio(
       aspectRatio: 1.2,
       child: Stack(
         alignment: Alignment.center,
@@ -54,10 +70,10 @@ class _DeficitRingWidgetState extends State<DeficitRingWidget> with SingleTicker
                 size: const Size.square(240),
                 painter: _RingPainter(
                   summary: widget.summary,
-                  progress: _animation.value,
+                  progress: reduceMotion ? 1.0 : _animation.value,
                   carbsColor: theme.colorScheme.primary,
                   proteinColor: theme.colorScheme.secondary,
-                  fatColor: const Color(0xFFD47A22), // Warm terracotta/rust for fat to avoid gold/green collision
+                  fatColor: AppColorScheme.macroFat,
                   trackColor: theme.colorScheme.outline.withValues(alpha: 0.1),
                 ),
               );
@@ -66,7 +82,8 @@ class _DeficitRingWidgetState extends State<DeficitRingWidget> with SingleTicker
           AnimatedBuilder(
             animation: _animation,
             builder: (context, child) {
-              final animatedValue = (widget.summary.consumedKcal * _animation.value).toInt();
+              final effectiveProgress = reduceMotion ? 1.0 : _animation.value;
+              final animatedValue = (widget.summary.consumedKcal * effectiveProgress).toInt();
               final animatedRemaining = widget.summary.targetKcal - animatedValue;
               final displayVal = animatedRemaining > 0 ? animatedRemaining : 0;
               final isOver = animatedRemaining < 0;
@@ -96,6 +113,8 @@ class _DeficitRingWidgetState extends State<DeficitRingWidget> with SingleTicker
             },
           ),
         ],
+      ),
+        ),
       ),
     );
   }

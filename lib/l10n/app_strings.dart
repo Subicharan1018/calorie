@@ -137,6 +137,8 @@ class AppStrings {
   String get networkError => isTamil ? 'இணைய இணைப்பு இல்லை. Tailscale இணைப்பை சரிபார்க்கவும்.' : 'Can\'t reach server · Check your Tailscale connection';
   String get retryButton => isTamil ? 'மீண்டும் முயற்சி செய்' : 'Retry';
   String get apiError => isTamil ? 'பயன்பாட்டு பிழை நிகழ்ந்துள்ளது' : 'API error occurred';
+  String get couldntLoad => isTamil ? 'இதை இப்போது ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.' : 'Couldn\'t load this right now. Please try again.';
+  String get logFailed => isTamil ? 'பதிவு செய்ய முடியவில்லை. மீண்டும் முயற்சிக்கவும்.' : 'Couldn\'t log that. Please try again.';
   String get validationError => isTamil ? 'மதிப்பு தவறானது' : 'Validation error';
   String get emptySearchResult => isTamil ? 'முடிவுகள் எதுவும் இல்லை. பொதுவான பெயரை தேடவும்' : 'No results found. Try searching by common name.';
 

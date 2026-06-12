@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/shared/widgets/app_scaffold.dart';
 import 'package:kalori/shared/widgets/empty_state.dart';
+import 'package:kalori/shared/widgets/friendly_error.dart';
 import 'package:kalori/shared/widgets/tamil_english_label.dart';
 import 'package:kalori/features/log/providers/vegetable_search_provider.dart';
 import 'package:kalori/l10n/app_strings.dart';
@@ -88,11 +89,9 @@ class VegetableInputScreen extends ConsumerWidget {
           Expanded(
             child: searchResults.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Text('${s.apiError}: $err', style: TextStyle(color: theme.colorScheme.error)),
-                ),
+              error: (err, _) => FriendlyErrorView(
+                error: err,
+                onRetry: () => ref.invalidate(searchResultsProvider),
               ),
               data: (results) {
                 if (results.isEmpty && ref.watch(vegetableSearchQueryProvider).isEmpty) {

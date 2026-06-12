@@ -17,6 +17,15 @@ class AppColorScheme {
   static const Color inkDark = Color(0xFFE6E9E5);           // Bone - oklch(0.93 0.005 140)
   static const Color mutedDark = Color(0xFF8C918B);         // Lichen - oklch(0.65 0.01 140)
 
+  // ── Macro & nutrient accents ───────────────────────────────────────────────
+  // Earthen tones tuned to the cardamom/saffron identity (no stock-Material
+  // swatches). Single source of truth; widgets must not hardcode these hexes.
+  static const Color macroFat       = Color(0xFFD47A22);    // Warm terracotta — fat (carbs=primary, protein=accent)
+  static const Color nutrientFibre  = Color(0xFF3F6B33);    // Deep cardamom green
+  static const Color nutrientIron   = Color(0xFFA8472A);    // Rust (was stock deep-orange)
+  static const Color nutrientCalcium= Color(0xFF6E4B86);    // Muted plum (was neon purple)
+  static const Color nutrientVitC   = Color(0xFFCB7A12);    // Deep saffron-orange
+
   static const ColorScheme light = ColorScheme.light(
     primary: primary,
     onPrimary: Colors.white,

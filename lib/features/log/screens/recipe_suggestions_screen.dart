@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kalori/core/theme/spacing.dart';
+import 'package:kalori/core/theme/color_scheme.dart';
 import 'package:kalori/shared/widgets/app_scaffold.dart';
 import 'package:kalori/shared/widgets/empty_state.dart';
+import 'package:kalori/shared/widgets/friendly_error.dart';
 import 'package:kalori/shared/widgets/tamil_english_label.dart';
 import 'package:kalori/features/log/providers/recipe_suggestions_provider.dart';
 import 'package:kalori/features/log/providers/vegetable_search_provider.dart';
@@ -28,17 +30,16 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
     final s = AppStrings.of(context);
     final suggestionsAsync = ref.watch(recipeSuggestionsProvider);
     final selectedCount = ref.watch(selectedVegetablesProvider).length;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
 
     return AppScaffold(
       title: s.isTamil ? 'காய்கறிகளுக்கான சமையல் குறிப்புகள்' : 'Recipes for your vegetables',
       subtitle: s.isTamil ? '$selectedCount காய்கறிகள் தேர்வுசெய்யப்பட்டன' : '$selectedCount vegetables matched',
       body: suggestionsAsync.when(
         loading: () => const _LoadingView(),
-        error: (err, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Text('${s.apiError}: $err', style: TextStyle(color: theme.colorScheme.error)),
-          ),
+        error: (err, _) => FriendlyErrorView(
+          error: err,
+          onRetry: () => ref.invalidate(recipeSuggestionsProvider),
         ),
         data: (recipes) {
           if (recipes.isEmpty) {
@@ -112,7 +113,7 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
                   separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
                   itemBuilder: (context, index) {
                     final recipe = sortedRecipes[index];
-                    return Card(
+                    final card = Card(
                       elevation: AppElevation.none,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.card),
@@ -164,7 +165,10 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
                                   ),
                                   child: Text(
                                     s.isTamil ? 'AI பரிந்துரைத்தது' : 'AI Suggested',
-                                    style: const TextStyle(fontSize: 10, color: Color(0xFF7A4A00), fontWeight: FontWeight.bold),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: const Color(0xFF7A4A00),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -175,7 +179,7 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
                                   const SizedBox(width: AppSpacing.sm),
                                   _MacroDot(color: theme.colorScheme.secondary, label: '${s.protein.substring(0, 1)}: ${recipe.proteinPer100g.toStringAsFixed(1)}g'),
                                   const SizedBox(width: AppSpacing.sm),
-                                  _MacroDot(color: const Color(0xFFD47A22), label: '${s.fat.substring(0, 1)}: ${recipe.fatPer100g.toStringAsFixed(1)}g'),
+                                  _MacroDot(color: AppColorScheme.macroFat, label: '${s.fat.substring(0, 1)}: ${recipe.fatPer100g.toStringAsFixed(1)}g'),
                                 ],
                               ),
                               const SizedBox(height: AppSpacing.md),
@@ -223,7 +227,9 @@ class _RecipeSuggestionsScreenState extends ConsumerState<RecipeSuggestionsScree
                           ),
                         ),
                       ),
-                    ).animate().fade(delay: (40 * index).ms).slideY(begin: 0.1, duration: 300.ms, curve: Curves.easeOutCubic);
+                    );
+                    if (reduceMotion) return card;
+                    return card.animate().fade(delay: (40 * index).ms).slideY(begin: 0.1, duration: 300.ms, curve: Curves.easeOutCubic);
                   },
                 ),
               ),
@@ -249,7 +255,7 @@ class _SortChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChoiceChip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
+      label: Text(label, style: Theme.of(context).textTheme.labelMedium),
       selected: isSelected,
       onSelected: (_) => onSelected(),
       labelPadding: const EdgeInsets.symmetric(horizontal: 4),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kalori/core/theme/spacing.dart';
+import 'package:kalori/core/theme/color_scheme.dart';
 import 'package:kalori/features/log/models/recipe.dart';
 import 'package:kalori/shared/widgets/stat_chip.dart';
 import 'package:kalori/features/log/widgets/meal_log_quantity_sheet.dart';
@@ -149,7 +150,7 @@ class _RecipeDetailSheetState extends State<RecipeDetailSheet> {
                         _BigMacroStat(
                           label: s.fat,
                           value: '${(widget.recipe.fatPer100g * multiplier).toStringAsFixed(1)}g',
-                          color: const Color(0xFFD47A22),
+                          color: AppColorScheme.macroFat,
                         ),
                       ],
                     ),

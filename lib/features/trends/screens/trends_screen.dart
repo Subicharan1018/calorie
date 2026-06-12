@@ -6,6 +6,7 @@ import 'package:kalori/features/trends/widgets/calorie_trend_chart.dart';
 import 'package:kalori/features/trends/widgets/weight_progress_chart.dart';
 import 'package:kalori/features/trends/widgets/weight_log_sheet.dart';
 import 'package:kalori/shared/widgets/app_scaffold.dart';
+import 'package:kalori/shared/widgets/friendly_error.dart';
 import 'package:kalori/l10n/app_strings.dart';
 
 class TrendsScreen extends ConsumerWidget {
@@ -21,18 +22,9 @@ class TrendsScreen extends ConsumerWidget {
       title: s.trends,
       body: stateAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('${s.apiError}: $err', style: TextStyle(color: theme.colorScheme.error)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(trendsProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+        error: (err, _) => FriendlyErrorView(
+          error: err,
+          onRetry: () => ref.invalidate(trendsProvider),
         ),
         data: (state) {
           String weightStat = s.isTamil ? 'கூடுதல் எடை தரவை பதிவு செய்க' : 'Log more weight data';

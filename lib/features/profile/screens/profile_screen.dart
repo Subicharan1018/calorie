@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/features/profile/providers/profile_provider.dart';
 import 'package:kalori/core/providers/language_provider.dart';
+import 'package:kalori/shared/widgets/friendly_error.dart';
 import 'package:kalori/l10n/app_strings.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -101,18 +102,9 @@ class ProfileScreen extends ConsumerWidget {
       backgroundColor: theme.colorScheme.surface,
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('${s.apiError}: $err', style: TextStyle(color: theme.colorScheme.error)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(profileProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+        error: (err, _) => FriendlyErrorView(
+          error: err,
+          onRetry: () => ref.invalidate(profileProvider),
         ),
         data: (profile) {
           return CustomScrollView(

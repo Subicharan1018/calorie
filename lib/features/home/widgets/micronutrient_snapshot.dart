@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kalori/core/theme/spacing.dart';
 import 'package:kalori/l10n/app_strings.dart';
 import 'package:kalori/features/home/providers/recommendations_provider.dart';
+import 'package:kalori/shared/widgets/friendly_error.dart';
 
 class MicronutrientSnapshot extends ConsumerWidget {
   const MicronutrientSnapshot({super.key});
@@ -26,7 +27,11 @@ class MicronutrientSnapshot extends ConsumerWidget {
         ),
         error: (err, _) => Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
-          child: Text('${s.apiError}: $err', style: TextStyle(color: theme.colorScheme.error)),
+          child: FriendlyErrorView(
+            error: err,
+            compact: true,
+            onRetry: () => ref.invalidate(nutrientGapsProvider),
+          ),
         ),
         data: (gaps) {
           if (gaps == null) {

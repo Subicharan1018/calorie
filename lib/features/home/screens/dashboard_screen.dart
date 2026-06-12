@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kalori/core/theme/spacing.dart';
+import 'package:kalori/core/theme/color_scheme.dart';
 import 'package:kalori/features/home/providers/dashboard_provider.dart';
 import 'package:kalori/features/home/widgets/deficit_ring.dart';
 import 'package:kalori/features/home/widgets/meal_log_summary.dart';
@@ -9,6 +10,7 @@ import 'package:kalori/features/home/widgets/micronutrient_snapshot.dart';
 import 'package:kalori/features/home/widgets/food_recommendations.dart';
 import 'package:kalori/shared/widgets/app_scaffold.dart';
 import 'package:kalori/shared/widgets/stat_chip.dart';
+import 'package:kalori/shared/widgets/friendly_error.dart';
 import 'package:intl/intl.dart';
 import 'package:kalori/l10n/app_strings.dart';
 
@@ -20,6 +22,8 @@ class DashboardScreen extends ConsumerWidget {
     final summaryAsync = ref.watch(dashboardProvider);
     final today = DateTime.now();
     final s = AppStrings.of(context);
+    // Let chip rows grow with the user's text scale (tested up to 1.3×).
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.6);
     final formatter = DateFormat('EEEE, d MMM');
     
     final Map<int, String> tamilDays = {
@@ -40,18 +44,9 @@ class DashboardScreen extends ConsumerWidget {
           : formatter.format(today),
       body: summaryAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('${s.apiError}: $err', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(dashboardProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+        error: (err, _) => FriendlyErrorView(
+          error: err,
+          onRetry: () => ref.invalidate(dashboardProvider),
         ),
         data: (summary) {
           return SingleChildScrollView(
@@ -71,14 +66,14 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox(width: AppSpacing.sm),
                     StatChip(label: s.protein, value: '${summary.consumedProtein.toInt()}g', color: Theme.of(context).colorScheme.secondary),
                     const SizedBox(width: AppSpacing.sm),
-                    StatChip(label: s.fat, value: '${summary.consumedFat.toInt()}g', color: const Color(0xFFD47A22)),
+                    StatChip(label: s.fat, value: '${summary.consumedFat.toInt()}g', color: AppColorScheme.macroFat),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 
                 // Section C — Quick Actions
                 SizedBox(
-                  height: 40,
+                  height: 40.0 * textScale,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),

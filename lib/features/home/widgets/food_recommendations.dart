@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:kalori/core/theme/spacing.dart';
+import 'package:kalori/core/theme/color_scheme.dart';
 import 'package:kalori/l10n/app_strings.dart';
 import 'package:kalori/core/models/recommendation_item.dart';
 import 'package:kalori/features/home/providers/recommendations_provider.dart';
 import 'package:kalori/features/home/providers/dashboard_provider.dart';
 import 'package:kalori/api/api_client.dart';
+import 'package:kalori/shared/widgets/friendly_error.dart';
+import 'package:kalori/widgets/error_toast.dart';
 
 class FoodRecommendationsWidget extends ConsumerStatefulWidget {
   const FoodRecommendationsWidget({super.key});
@@ -40,6 +43,7 @@ class _FoodRecommendationsWidgetState extends ConsumerState<FoodRecommendationsW
     final s = AppStrings.of(context);
     final recsAsync = ref.watch(recommendationsProvider);
     final gapsAsync = ref.watch(nutrientGapsProvider);
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,7 +61,7 @@ class _FoodRecommendationsWidgetState extends ConsumerState<FoodRecommendationsW
 
             if (deficits.isEmpty) return const SizedBox.shrink();
 
-            return Container(
+            final gapCard = Container(
               width: double.infinity,
               margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
               padding: const EdgeInsets.all(AppSpacing.md),
@@ -93,7 +97,10 @@ class _FoodRecommendationsWidgetState extends ConsumerState<FoodRecommendationsW
                   ),
                 ],
               ),
-            ).animate().fade(duration: 400.ms).slideY(begin: 0.1);
+            );
+            return reduceMotion
+                ? gapCard
+                : gapCard.animate().fade(duration: 400.ms).slideY(begin: 0.1);
           },
           loading: () => const SizedBox.shrink(),
           error: (_, __) => const SizedBox.shrink(),
@@ -124,7 +131,7 @@ class _FoodRecommendationsWidgetState extends ConsumerState<FoodRecommendationsW
         Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           child: SizedBox(
-            height: 40,
+            height: 40.0 * MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.6),
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -147,9 +154,10 @@ class _FoodRecommendationsWidgetState extends ConsumerState<FoodRecommendationsW
             padding: EdgeInsets.all(AppSpacing.xl),
             child: Center(child: CircularProgressIndicator()),
           ),
-          error: (err, _) => Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Center(child: Text('${s.apiError}: $err')),
+          error: (err, _) => FriendlyErrorView(
+            error: err,
+            compact: true,
+            onRetry: () => ref.read(recommendationsProvider.notifier).forceRefresh(),
           ),
           data: (recsState) {
             final list = recsState.slots[_activeSlot] ?? [];
@@ -213,13 +221,13 @@ class _FoodRecommendationsWidgetState extends ConsumerState<FoodRecommendationsW
     if (topNut.contains('protein')) {
       badgeColor = theme.colorScheme.secondary;
     } else if (topNut.contains('fibre')) {
-      badgeColor = const Color(0xFF2E7D32); // Deep Green
+      badgeColor = AppColorScheme.nutrientFibre;
     } else if (topNut.contains('iron')) {
-      badgeColor = const Color(0xFFD84315); // Deep Orange
+      badgeColor = AppColorScheme.nutrientIron;
     } else if (topNut.contains('calcium')) {
-      badgeColor = const Color(0xFF6A1B9A); // Purple
+      badgeColor = AppColorScheme.nutrientCalcium;
     } else if (topNut.contains('vitc')) {
-      badgeColor = const Color(0xFFEF6C00); // Orange
+      badgeColor = AppColorScheme.nutrientVitC;
     }
 
     return Card(
@@ -277,9 +285,8 @@ class _FoodRecommendationsWidgetState extends ConsumerState<FoodRecommendationsW
                   child: Text(
                     item.topNutrient != null
                         ? item.topNutrient!.toUpperCase()
-                        : 'GAP FILL',
-                    style: TextStyle(
-                      fontSize: 10,
+                        : (s.isTamil ? 'பற்றாக்குறை' : 'GAP FILL'),
+                    style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: badgeColor,
                     ),
@@ -434,11 +441,9 @@ class _QuickLogSheetState extends ConsumerState<_QuickLogSheet> {
         );
         Navigator.pop(context);
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error logging recommendation: $e')),
-        );
+        ErrorToast.show(context, AppStrings.of(context).logFailed);
       }
     } finally {
       if (mounted) {
@@ -551,7 +556,7 @@ class _QuickLogSheetState extends ConsumerState<_QuickLogSheet> {
                     ? null
                     : (val) => setState(() => _mealSlot = val.first),
                 style: SegmentedButton.styleFrom(
-                  textStyle: const TextStyle(fontSize: 11),
+                  textStyle: theme.textTheme.labelMedium,
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
